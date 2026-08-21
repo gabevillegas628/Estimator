@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ChevronDown, ChevronUp, TriangleAlert, Info, Plus, Trash2, RotateCcw, Lock, LogOut } from "lucide-react";
+import { Settings, ChevronDown, ChevronUp, TriangleAlert, Info, Plus, Trash2, RotateCcw, Lock, LogOut, Eye, EyeOff, Check } from "lucide-react";
 
 import {
   formatMoney,
@@ -22,6 +22,7 @@ const SHELL_CLASSES = "min-h-screen flex items-center justify-center bg-[#F0EEE8
 // is reachable without it.
 function LoginScreen({ onAuthenticated }) {
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,15 +56,29 @@ function LoginScreen({ onAuthenticated }) {
           <h1 className="serif text-2xl font-medium tracking-tight mt-2">Down Payment Estimator</h1>
           <p className="text-sm text-[#6B6656] mt-1">Enter the department password to continue.</p>
 
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoFocus
-            autoComplete="current-password"
-            aria-label="Department password"
-            className="mt-4 w-full border border-[#C9C4B8] rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#7A3B54]/40"
-          />
+          <div className="relative mt-4">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+              autoComplete="current-password"
+              aria-label="Department password"
+              className="w-full border border-[#C9C4B8] rounded-md pl-3 pr-10 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#7A3B54]/40"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              // tabIndex -1 so tabbing from the field goes straight to Sign in,
+              // rather than landing on a control most people will not use.
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              title={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#9A9584] hover:text-[#6B6656] transition-colors"
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
 
           {error && (
             <p role="alert" className="text-sm text-[#7A3B54] mt-2">
@@ -131,17 +146,26 @@ function DownPaymentEstimator({ onSignedOut }) {
   const [minFlag, setMinFlag] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [settingsSavedAt, setSettingsSavedAt] = useState(null);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [termMonths, setTermMonths] = useState(DEFAULT_SETTINGS.defaultTermMonths);
   const [interestRate, setInterestRate] = useState(DEFAULT_SETTINGS.defaultInterestRate);
-  const [dependencyFlags, setDependencyFlags] = useState({});
+  // Staff read dependency status straight off the ISIR, so this is a direct
+  // choice rather than something re-derived from the nine FAFSA triggers. The
+  // trigger list is still available as reference below the toggle.
+  const [isIndependent, setIsIndependent] = useState(false);
+  const [criteriaOpen, setCriteriaOpen] = useState(false);
   const [parentPlusDenied, setParentPlusDenied] = useState(false);
   const [startingGradeLevel, setStartingGradeLevel] = useState(1);
 
-  // Debounce timers for in-flight program edits, keyed by "programId:field".
+  // In-flight debounced program edits, keyed by "programId:field". Each entry
+  // keeps its payload alongside the timer so the Save button can flush anything
+  // still waiting instead of racing it.
   const pendingWrites = useRef(new Map());
   useEffect(() => {
-    const timers = pendingWrites.current;
-    return () => timers.forEach(clearTimeout);
+    const pending = pendingWrites.current;
+    return () => pending.forEach((p) => clearTimeout(p.timer));
   }, []);
 
   const flashError = useCallback((msg) => {
@@ -199,17 +223,64 @@ function DownPaymentEstimator({ onSignedOut }) {
     }
   }, []);
 
-  const persistSettings = useCallback(
-    async (next) => {
-      setSettings(next);
-      try {
-        await api.saveSettings(next);
-      } catch (err) {
-        handleApiError(err, "Couldn't save settings — check connection and try again.");
-      }
-    },
-    [handleApiError]
-  );
+  // Settings edits stay local until explicitly saved. They used to write on
+  // every keystroke, which meant typing "7395" saved four times — once per
+  // partial number, each briefly storing a nonsense award maximum — and gave
+  // no signal that anything had been stored at all.
+  // Fires any debounced program edits immediately rather than waiting out their
+  // timers, so pressing Save cannot return "Saved" while a write is still queued.
+  const flushProgramWrites = useCallback(async () => {
+    const pending = [...pendingWrites.current.values()];
+    if (pending.length === 0) return;
+
+    pendingWrites.current.clear();
+    pending.forEach((p) => clearTimeout(p.timer));
+    await Promise.all(pending.map((p) => api.updateProgram(p.id, { [p.field]: p.value })));
+  }, []);
+
+  const updateSetting = useCallback((next) => {
+    setSettings(next);
+    setSettingsDirty(true);
+    setSettingsSavedAt(null);
+  }, []);
+
+  // Saves everything in the settings panel, not just the settings half. Program
+  // rows still write on their own so nothing is ever lost, but the button has to
+  // account for them too or "Saved" would be a lie while a debounce is pending.
+  const saveAllSettings = useCallback(async () => {
+    setSavingSettings(true);
+    try {
+      await flushProgramWrites();
+      // The server merges over defaults on write, so take back what it stored
+      // rather than assuming local state matches.
+      setSettings(await api.saveSettings(settings));
+      setSettingsDirty(false);
+      setSettingsSavedAt(Date.now());
+    } catch (err) {
+      handleApiError(err, "Couldn't save — check connection and try again.");
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [settings, handleApiError, flushProgramWrites]);
+
+  // Unsaved settings survive closing the panel (they stay in state, and the
+  // estimate above reflects them immediately) but not a reload, so warn on the
+  // one case that actually loses work.
+  useEffect(() => {
+    if (!settingsDirty) return;
+    const warn = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [settingsDirty]);
+
+  useEffect(() => {
+    if (!settingsSavedAt) return;
+    const t = setTimeout(() => setSettingsSavedAt(null), 3000);
+    return () => clearTimeout(t);
+  }, [settingsSavedAt]);
 
   const signOut = useCallback(async () => {
     try {
@@ -235,7 +306,6 @@ function DownPaymentEstimator({ onSignedOut }) {
   });
   const hasResult = scheduledPell !== null && selectedProgram;
 
-  const isIndependent = DEPENDENCY_CRITERIA.some((c) => dependencyFlags[c.key]);
   const useIndependentTable = isIndependent || parentPlusDenied;
   const aggregateSub = useIndependentTable ? settings.loanLimits.aggregateIndependentSub : settings.loanLimits.aggregateDependentSub;
   const aggregateTotal = useIndependentTable ? settings.loanLimits.aggregateIndependentTotal : settings.loanLimits.aggregateDependentTotal;
@@ -277,19 +347,20 @@ function DownPaymentEstimator({ onSignedOut }) {
     setPrograms((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
 
     const key = `${id}:${field}`;
-    clearTimeout(pendingWrites.current.get(key));
-    pendingWrites.current.set(
-      key,
-      setTimeout(async () => {
-        pendingWrites.current.delete(key);
-        try {
-          await api.updateProgram(id, { [field]: value });
-        } catch (err) {
-          handleApiError(err, "Couldn't save that change — check connection and try again.");
-          revertPrograms();
-        }
-      }, 600)
-    );
+    const existing = pendingWrites.current.get(key);
+    if (existing) clearTimeout(existing.timer);
+
+    const timer = setTimeout(async () => {
+      pendingWrites.current.delete(key);
+      try {
+        await api.updateProgram(id, { [field]: value });
+      } catch (err) {
+        handleApiError(err, "Couldn't save that change — check connection and try again.");
+        revertPrograms();
+      }
+    }, 600);
+
+    pendingWrites.current.set(key, { timer, id, field, value });
   };
 
   const addProgram = async () => {
@@ -449,19 +520,62 @@ function DownPaymentEstimator({ onSignedOut }) {
               <span className="text-xs text-[#9A9584]">FAFSA dependency — not a program name</span>
             </div>
 
-            <p className="text-xs text-[#9A9584] mb-3">Check any that apply — a single yes makes the student independent.</p>
-            <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2 mb-4">
-              {DEPENDENCY_CRITERIA.map((c) => (
-                <label key={c.key} className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={!!dependencyFlags[c.key]}
-                    onChange={(e) => setDependencyFlags({ ...dependencyFlags, [c.key]: e.target.checked })}
-                  />
-                  <span>{c.label}</span>
-                </label>
-              ))}
+            <div className="mb-4">
+              <div className="inline-flex rounded-md border border-[#C9C4B8] overflow-hidden" role="group" aria-label="Dependency status">
+                {[
+                  { label: "Dependent", value: false },
+                  { label: "Independent", value: true },
+                ].map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    aria-pressed={isIndependent === option.value}
+                    onClick={() => {
+                      setIsIndependent(option.value);
+                      // The PLUS-denial question only applies to a dependent
+                      // student, so it should not linger after switching.
+                      if (option.value) setParentPlusDenied(false);
+                    }}
+                    className={`px-4 py-1.5 text-sm transition-colors ${
+                      isIndependent === option.value
+                        ? "bg-[#7A3B54] text-white"
+                        : "bg-white text-[#6B6656] hover:bg-[#E7E3D8]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCriteriaOpen((o) => !o)}
+                aria-expanded={criteriaOpen}
+                className="block mt-2 text-xs text-[#7A3B54] hover:underline"
+              >
+                {criteriaOpen ? "Hide" : "What makes a student independent?"}
+              </button>
+
+              {/* Kept as reference rather than deleted: the common shorthand
+                  ("24 or older unless married or has kids") misses several of
+                  these, and staff overriding the ISIR on that basis would be a
+                  quiet source of wrong estimates. */}
+              {criteriaOpen && (
+                <div className="fade-in mt-2 rounded-md bg-[#F0EEE8] border border-[#DDD8CA] p-3">
+                  <p className="text-xs text-[#6B6656] mb-2">
+                    Any single one of these makes a student independent for FAFSA purposes. The ISIR already reflects this —
+                    use it rather than re-deriving.
+                  </p>
+                  <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1">
+                    {DEPENDENCY_CRITERIA.map((c) => (
+                      <li key={c.key} className="text-xs text-[#6B6656] flex gap-1.5">
+                        <span className="text-[#9A9584]">•</span>
+                        <span>{c.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-end gap-4">
@@ -700,17 +814,17 @@ function DownPaymentEstimator({ onSignedOut }) {
                 <div>
                   <label className="text-xs text-[#9A9584]">Award year label</label>
                   <input className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5" value={settings.awardYearLabel}
-                    onChange={(e) => persistSettings({ ...settings, awardYearLabel: e.target.value })} />
+                    onChange={(e) => updateSetting({ ...settings, awardYearLabel: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Max Pell</label>
                   <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMax}
-                    onChange={(e) => persistSettings({ ...settings, awardYearMax: Number(e.target.value) })} />
+                    onChange={(e) => updateSetting({ ...settings, awardYearMax: Number(e.target.value) })} />
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Min Pell</label>
                   <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMin}
-                    onChange={(e) => persistSettings({ ...settings, awardYearMin: Number(e.target.value) })} />
+                    onChange={(e) => updateSetting({ ...settings, awardYearMin: Number(e.target.value) })} />
                 </div>
               </div>
               <p className="text-xs text-[#9A9584] mt-2">These change every award year via the Dept. of Education's Pell Grant payment letter — update at the start of each award year.</p>
@@ -721,7 +835,7 @@ function DownPaymentEstimator({ onSignedOut }) {
               <div className="w-40">
                 <label className="text-xs text-[#9A9584]">Clock hours</label>
                 <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.academicYearHours}
-                  onChange={(e) => persistSettings({ ...settings, academicYearHours: Number(e.target.value) })} />
+                  onChange={(e) => updateSetting({ ...settings, academicYearHours: Number(e.target.value) })} />
               </div>
               <p className="text-xs text-[#9A9584] mt-2">
                 Governs both Pell proration and loan-period progression (grade level bumps once a period completes this many hours).
@@ -735,17 +849,17 @@ function DownPaymentEstimator({ onSignedOut }) {
                 <div>
                   <label className="text-xs text-[#9A9584]">Default term (months)</label>
                   <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.defaultTermMonths}
-                    onChange={(e) => persistSettings({ ...settings, defaultTermMonths: Number(e.target.value) })} />
+                    onChange={(e) => updateSetting({ ...settings, defaultTermMonths: Number(e.target.value) })} />
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Default rate (% APR)</label>
                   <input type="number" step={0.1} className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.defaultInterestRate}
-                    onChange={(e) => persistSettings({ ...settings, defaultInterestRate: Number(e.target.value) })} />
+                    onChange={(e) => updateSetting({ ...settings, defaultInterestRate: Number(e.target.value) })} />
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Loan origination fee (%)</label>
                   <input type="number" step={0.001} className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.originationFeePct}
-                    onChange={(e) => persistSettings({ ...settings, originationFeePct: Number(e.target.value) })} />
+                    onChange={(e) => updateSetting({ ...settings, originationFeePct: Number(e.target.value) })} />
                 </div>
               </div>
               <p className="text-xs text-[#9A9584] mt-2">
@@ -773,7 +887,7 @@ function DownPaymentEstimator({ onSignedOut }) {
                             <span className="text-[10px] text-[#9A9584]">Sub</span>
                             <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono text-xs"
                               value={settings.loanLimits[group][yr].sub}
-                              onChange={(e) => persistSettings({
+                              onChange={(e) => updateSetting({
                                 ...settings,
                                 loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], sub: Number(e.target.value) } } },
                               })} />
@@ -782,7 +896,7 @@ function DownPaymentEstimator({ onSignedOut }) {
                             <span className="text-[10px] text-[#9A9584]">Total</span>
                             <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono text-xs"
                               value={settings.loanLimits[group][yr].total}
-                              onChange={(e) => persistSettings({
+                              onChange={(e) => updateSetting({
                                 ...settings,
                                 loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], total: Number(e.target.value) } } },
                               })} />
@@ -797,15 +911,15 @@ function DownPaymentEstimator({ onSignedOut }) {
                 <div>
                   <label className="text-xs text-[#9A9584]">Dependent aggregate (sub / total)</label>
                   <div className="flex gap-1 mt-1">
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentSub} onChange={(e) => persistSettings({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentSub: Number(e.target.value) } })} />
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentTotal} onChange={(e) => persistSettings({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentTotal: Number(e.target.value) } })} />
+                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentSub} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentSub: Number(e.target.value) } })} />
+                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentTotal} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentTotal: Number(e.target.value) } })} />
                   </div>
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Independent aggregate (sub / total)</label>
                   <div className="flex gap-1 mt-1">
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentSub} onChange={(e) => persistSettings({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentSub: Number(e.target.value) } })} />
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentTotal} onChange={(e) => persistSettings({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentTotal: Number(e.target.value) } })} />
+                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentSub} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentSub: Number(e.target.value) } })} />
+                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentTotal} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentTotal: Number(e.target.value) } })} />
                   </div>
                 </div>
               </div>
@@ -820,11 +934,37 @@ function DownPaymentEstimator({ onSignedOut }) {
                 placeholder="e.g. 'Assign crossover payment periods to the award year of the student's start date, unless remaining eligibility runs out — confirm with [financial aid director] on exceptions.'"
                 className="w-full border border-[#C9C4B8] rounded px-3 py-2 text-sm"
                 value={settings.crossoverNote}
-                onChange={(e) => persistSettings({ ...settings, crossoverNote: e.target.value })}
+                onChange={(e) => updateSetting({ ...settings, crossoverNote: e.target.value })}
               />
               <p className="text-xs text-[#9A9584] mt-2">
                 This is a policy choice the school makes for Pell specifically — the banner above only flags <em>when</em> it applies. Loan periods (below) aren't affected by this since they follow the academic year, not the award year.
               </p>
+            </div>
+
+            {/* Sticks to the bottom of the viewport while the panel is open, so
+                the button is reachable without scrolling back down a long form. */}
+            <div className="sticky bottom-0 -mx-5 -mb-5 px-5 py-3 bg-white border-t border-[#DDD8CA] flex items-center gap-3">
+              <button
+                type="button"
+                onClick={saveAllSettings}
+                disabled={savingSettings}
+                className="rounded-md bg-[#7A3B54] text-white text-sm font-medium px-4 py-2 hover:bg-[#633044] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {savingSettings ? "Saving…" : "Save changes"}
+              </button>
+
+              {settingsDirty && !savingSettings && (
+                <span className="text-sm text-[#B8863B]">Unsaved changes</span>
+              )}
+              {settingsSavedAt && !settingsDirty && (
+                <span className="fade-in flex items-center gap-1.5 text-sm text-[#4A7C59]">
+                  <Check size={15} />
+                  Saved
+                </span>
+              )}
+              {!settingsDirty && !settingsSavedAt && !savingSettings && (
+                <span className="text-sm text-[#9A9584]">All changes saved</span>
+              )}
             </div>
           </div>
         )}
