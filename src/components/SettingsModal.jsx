@@ -116,40 +116,55 @@ export default function SettingsModal({
             <div>
               <h2 className="serif text-lg mb-1">Programs</h2>
               <p className="text-xs text-[#9A9584] mb-3">Shared with everyone who opens this tool. Student SAI entries above are never saved. "Tuition" prorates across periods by each period's share of total program hours. "Down payment" (books/kit or similar) is a charge added entirely to Period 1 — Pell reduces the combined Period-1 total in one shot, no special sequencing. Pell and loan limits prorate separately, by each period's share of one academic year.</p>
-              <div className="space-y-3">
+              {/* Each program is a filled card with a wine border. The previous
+                  version drew a 1px border around the card AND around all five
+                  inputs inside it, at near-identical weights, so four programs
+                  read as one undifferentiated field of lines.
+
+                  Two things fix that. The card border is now the accent colour
+                  rather than another neutral, so it reads as a deliberate edge
+                  instead of one more grey line. And the inputs dropped their
+                  borders entirely — white on the warm tint is boundary enough,
+                  which removes five competing lines per program. */}
+              <div className="space-y-2.5">
                 {programs.map((p) => (
-                  <div key={p.id} className="border border-[#DDD8CA] rounded-md p-3">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div key={p.id} className="bg-[#F0EEE8] border-2 border-[#7A3B54] rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
                       <input
-                        className="flex-1 border border-[#C9C4B8] rounded px-2 py-1.5 text-sm font-medium"
+                        aria-label={`Program name: ${p.name}`}
+                        className="serif flex-1 bg-white rounded-md px-2.5 py-1.5 text-base text-[#232530] border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
                         value={p.name}
                         onChange={(e) => updateProgramField(p.id, "name", e.target.value)}
                       />
-                      <button onClick={() => removeProgram(p.id)} className="text-[#9A9584] hover:text-[#B8863B]">
+                      <button
+                        onClick={() => removeProgram(p.id)}
+                        aria-label={`Delete ${p.name}`}
+                        title={`Delete ${p.name}`}
+                        className="p-2 rounded-md text-[#9A9584] hover:text-[#B8863B] hover:bg-[#E7E3D8] transition-colors"
+                      >
                         <Trash2 size={15} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Tuition ($)</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.totalCost} onChange={(e) => updateProgramField(p.id, "totalCost", Number(e.target.value))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Down payment ($)</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.downPayment} onChange={(e) => updateProgramField(p.id, "downPayment", Number(e.target.value))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Clock hours</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.clockHours} onChange={(e) => updateProgramField(p.id, "clockHours", Number(e.target.value))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Length (weeks)</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.lengthWeeks} onChange={(e) => updateProgramField(p.id, "lengthWeeks", Number(e.target.value))} />
-                      </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      {[
+                        { field: "totalCost", label: "Tuition ($)" },
+                        { field: "downPayment", label: "Down payment ($)" },
+                        { field: "clockHours", label: "Clock hours" },
+                        { field: "lengthWeeks", label: "Length (weeks)" },
+                      ].map(({ field, label }) => (
+                        <div key={field}>
+                          <label className="text-[10px] text-[#9A9584]" htmlFor={`${p.id}-${field}`}>
+                            {label}
+                          </label>
+                          <input
+                            id={`${p.id}-${field}`}
+                            type="number"
+                            className="w-full bg-white rounded px-2 py-1.5 mono mt-1 border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
+                            value={p[field]}
+                            onChange={(e) => updateProgramField(p.id, field, Number(e.target.value))}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -236,27 +251,30 @@ export default function SettingsModal({
                       {group === "independent" ? "Independent / parent PLUS denied" : "Dependent"}
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-sm">
+                      {/* Same fill-not-stroke treatment as the program cards:
+                          six of these sit in a tight grid, and bordering both
+                          the card and its two inputs produced eighteen lines in
+                          a space the width of a paragraph. */}
                       {["year1", "year2", "year3"].map((yr, i) => (
-                        <div key={yr} className="border border-[#DDD8CA] rounded px-2 py-1.5">
-                          <div className="text-[10px] text-[#9A9584] mb-1">{["Year 1", "Year 2", "Year 3+"][i]}</div>
-                          <div className="flex items-center gap-1 mb-1">
-                            <span className="text-[10px] text-[#9A9584]">Sub</span>
-                            <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono text-xs"
-                              value={settings.loanLimits[group][yr].sub}
-                              onChange={(e) => updateSetting({
-                                ...settings,
-                                loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], sub: Number(e.target.value) } } },
-                              })} />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-[#9A9584]">Total</span>
-                            <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono text-xs"
-                              value={settings.loanLimits[group][yr].total}
-                              onChange={(e) => updateSetting({
-                                ...settings,
-                                loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], total: Number(e.target.value) } } },
-                              })} />
-                          </div>
+                        <div key={yr} className="bg-[#F0EEE8] border-2 border-[#7A3B54] rounded-md px-2.5 py-2">
+                          <div className="text-[10px] text-[#9A9584] mb-1.5">{["Year 1", "Year 2", "Year 3+"][i]}</div>
+                          {[
+                            { key: "sub", label: "Sub" },
+                            { key: "total", label: "Total" },
+                          ].map(({ key, label }) => (
+                            <div key={key} className="flex items-center gap-1.5 mb-1 last:mb-0">
+                              <span className="text-[10px] text-[#9A9584] w-7 shrink-0">{label}</span>
+                              <input
+                                type="number"
+                                aria-label={`${group} year ${i + 1} ${label} limit`}
+                                className="w-full bg-white rounded px-1.5 py-1 mono text-xs border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
+                                value={settings.loanLimits[group][yr][key]}
+                                onChange={(e) => updateSetting({
+                                  ...settings,
+                                  loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], [key]: Number(e.target.value) } } },
+                                })} />
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>
