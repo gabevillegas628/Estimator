@@ -215,3 +215,32 @@ person edits at a time.
 
 Every settings read is folded over `DEFAULT_SETTINGS` via `mergeSettings`, so a
 row stored before a new field was added still loads.
+
+---
+
+## Licensing and terms
+
+Boilerplate that a tool other people might use ought to have. None of it has
+been near a lawyer — if this ever turns into something real, that is the point
+to get it reviewed properly.
+
+The Tool itself is proprietary — copyright Wildtype Technologies LLC, a New
+Jersey LLC. See [LICENSE](LICENSE). `package.json` is marked
+`"license": "UNLICENSED"` and `"private": true`, so it can never be published
+to npm by accident.
+
+[TERMS.md](TERMS.md) is the terms of service: free, as-is, no affiliation with
+any school or agency, and — the term that actually matters — **every estimate
+requires independent human verification before it is relied on or shown to a
+student.**
+
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) carries the open source
+attributions. A scan of all 211 packages found no GPL/AGPL/LGPL anywhere. Only
+four third-party components reach the browser (react, react-dom, scheduler,
+lucide-react — MIT and ISC), and Vite strips their license banners during
+minification, which is why the notices file exists. Re-run the check after
+adding dependencies:
+
+```bash
+npx license-checker-rseidelsohn --summary
+```

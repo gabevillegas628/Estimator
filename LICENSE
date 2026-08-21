@@ -1,0 +1,30 @@
+Copyright (c) 2026 Wildtype Technologies LLC. All rights reserved.
+
+Wildtype Technologies LLC is a New Jersey limited liability company
+("Wildtype").
+
+This software, including its source code, documentation, and compiled
+output (the "Software"), is the confidential and proprietary property of
+Wildtype. It is licensed, not sold, and is made available only to persons
+expressly authorized by Wildtype.
+
+No license or right is granted to any other person to use, copy, modify,
+merge, publish, distribute, sublicense, sell, or create derivative works
+of the Software, in whole or in part, without the prior written
+permission of Wildtype.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, AND
+NONINFRINGEMENT. IN NO EVENT SHALL WILDTYPE OR ITS MEMBERS BE LIABLE FOR
+ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The Software incorporates third-party open source components that remain
+subject to their own licenses. Those components and their required
+attributions are listed in THIRD-PARTY-NOTICES.md, and nothing in this
+notice limits the rights granted to you under those licenses with respect
+to those components.
+
+Use of the Software is additionally governed by TERMS.md.

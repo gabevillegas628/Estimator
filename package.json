@@ -2,6 +2,7 @@
   "name": "financial-aid-estimator",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "engines": {
     "node": ">=22"
