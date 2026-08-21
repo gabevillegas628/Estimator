@@ -1,6 +1,44 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X, Plus, Trash2, RotateCcw, Info, Check } from "lucide-react";
 
+import { formatMoney, parseMoneyInput } from "../lib/aid-calc.js";
+
+// A dollar field. <input type="number"> can only ever hold a bare numeric
+// string -- "$23,000" is not a value it accepts -- so money is a text input
+// that shows the formatted figure when idle and the raw number while focused.
+// That is the spreadsheet behaviour: read as currency, edit as digits.
+//
+// Reformatting only on blur is the point. A formatter that runs on every
+// keystroke has to re-place the caret afterwards, and gets it wrong the moment
+// inserting a comma shifts the text under it.
+function MoneyInput({ value, onChange, className = "", ...rest }) {
+  // Non-null only while focused, holding exactly what was typed, so a
+  // part-finished entry is never rewritten underneath the caret.
+  const [draft, setDraft] = useState(null);
+
+  return (
+    <input
+      {...rest}
+      type="text"
+      inputMode="numeric"
+      className={className}
+      value={draft === null ? formatMoney(value) : draft}
+      onFocus={(e) => {
+        // A zero reads as a placeholder here, not a figure worth keeping.
+        setDraft(Number(value) === 0 ? "" : String(value));
+        e.target.select();
+      }}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        // Reported live so the estimate behind the modal still reacts to these
+        // as they are typed, which is why this component does not own state.
+        onChange(parseMoneyInput(e.target.value));
+      }}
+      onBlur={() => setDraft(null)}
+    />
+  );
+}
+
 // School-wide configuration, lifted out of the page and into a modal. It used to
 // be an accordion that opened at the bottom of a long page while its own trigger
 // sat in the header, so opening it appeared to do nothing until you scrolled.
@@ -146,23 +184,34 @@ export default function SettingsModal({
                       </button>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      {/* The "($)" these money labels used to carry now lives
+                          in the field itself. */}
                       {[
-                        { field: "totalCost", label: "Tuition ($)" },
-                        { field: "downPayment", label: "Down payment ($)" },
+                        { field: "totalCost", label: "Tuition", money: true },
+                        { field: "downPayment", label: "Down payment", money: true },
                         { field: "clockHours", label: "Clock hours" },
                         { field: "lengthWeeks", label: "Length (weeks)" },
-                      ].map(({ field, label }) => (
+                      ].map(({ field, label, money }) => (
                         <div key={field}>
                           <label className="text-[10px] text-[#9A9584]" htmlFor={`${p.id}-${field}`}>
                             {label}
                           </label>
-                          <input
-                            id={`${p.id}-${field}`}
-                            type="number"
-                            className="w-full bg-white rounded px-2 py-1.5 mono mt-1 border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
-                            value={p[field]}
-                            onChange={(e) => updateProgramField(p.id, field, Number(e.target.value))}
-                          />
+                          {money ? (
+                            <MoneyInput
+                              id={`${p.id}-${field}`}
+                              className="w-full bg-white rounded px-2 py-1.5 mono mt-1 border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
+                              value={p[field]}
+                              onChange={(n) => updateProgramField(p.id, field, n)}
+                            />
+                          ) : (
+                            <input
+                              id={`${p.id}-${field}`}
+                              type="number"
+                              className="w-full bg-white rounded px-2 py-1.5 mono mt-1 border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
+                              value={p[field]}
+                              onChange={(e) => updateProgramField(p.id, field, Number(e.target.value))}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -189,13 +238,13 @@ export default function SettingsModal({
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Max Pell</label>
-                  <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMax}
-                    onChange={(e) => updateSetting({ ...settings, awardYearMax: Number(e.target.value) })} />
+                  <MoneyInput className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMax}
+                    onChange={(n) => updateSetting({ ...settings, awardYearMax: n })} />
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Min Pell</label>
-                  <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMin}
-                    onChange={(e) => updateSetting({ ...settings, awardYearMin: Number(e.target.value) })} />
+                  <MoneyInput className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMin}
+                    onChange={(n) => updateSetting({ ...settings, awardYearMin: n })} />
                 </div>
               </div>
               <p className="text-xs text-[#9A9584] mt-2">These change every award year via the Dept. of Education's Pell Grant payment letter — update at the start of each award year.</p>
@@ -272,14 +321,13 @@ export default function SettingsModal({
                           ].map(({ key, label }) => (
                             <div key={key} className="flex items-center gap-1.5 mb-1 last:mb-0">
                               <span className="text-[10px] text-[#9A9584] w-7 shrink-0">{label}</span>
-                              <input
-                                type="number"
+                              <MoneyInput
                                 aria-label={`${group} year ${i + 1} ${label} limit`}
                                 className="w-full bg-white rounded px-1.5 py-1 mono text-xs border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
                                 value={settings.loanLimits[group][yr][key]}
-                                onChange={(e) => updateSetting({
+                                onChange={(n) => updateSetting({
                                   ...settings,
-                                  loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], [key]: Number(e.target.value) } } },
+                                  loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], [key]: n } } },
                                 })} />
                             </div>
                           ))}
@@ -289,20 +337,45 @@ export default function SettingsModal({
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-3 text-sm w-80">
-                <div>
-                  <label className="text-xs text-[#9A9584]">Dependent aggregate (sub / total)</label>
-                  <div className="flex gap-1 mt-1">
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentSub} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentSub: Number(e.target.value) } })} />
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentTotal} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentTotal: Number(e.target.value) } })} />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Independent aggregate (sub / total)</label>
-                  <div className="flex gap-1 mt-1">
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentSub} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentSub: Number(e.target.value) } })} />
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentTotal} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentTotal: Number(e.target.value) } })} />
-                  </div>
+              {/* Lifetime aggregates. These were four unlabelled boxes under
+                  "(sub / total)" in a w-80 grid, so each input was ~74px for a
+                  five-digit figure and nothing said what "aggregate" meant or
+                  that it is reference-only. Same card treatment as the annual
+                  limits above, since they are the same kind of statutory
+                  figure, with the Sub/Total rows labelled rather than implied
+                  by the order they appear in. */}
+              <div className="mt-4">
+                <div className="text-xs font-medium text-[#232530] mb-1">Lifetime aggregate limits</div>
+                <p className="text-xs text-[#9A9584] mb-2">
+                  The most a student may borrow across their whole education, not per year. These are shown beside
+                  the estimate for reference only — the tool has no record of what a student borrowed before, so it
+                  never checks an estimate against them. Remaining eligibility comes from NSLDS.
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {[
+                    { group: "Dependent", sub: "aggregateDependentSub", total: "aggregateDependentTotal" },
+                    { group: "Independent / parent PLUS denied", sub: "aggregateIndependentSub", total: "aggregateIndependentTotal" },
+                  ].map(({ group, sub, total }) => (
+                    <div key={group} className="bg-[#F0EEE8] border-2 border-[#7A3B54] rounded-md px-2.5 py-2">
+                      <div className="text-[10px] text-[#9A9584] mb-1.5">{group}</div>
+                      {[
+                        { key: sub, label: "Sub" },
+                        { key: total, label: "Total" },
+                      ].map(({ key, label }) => (
+                        <div key={key} className="flex items-center gap-1.5 mb-1 last:mb-0">
+                          <span className="text-[10px] text-[#9A9584] w-7 shrink-0">{label}</span>
+                          <MoneyInput
+                            aria-label={`${group} lifetime aggregate ${label} limit`}
+                            className="w-full bg-white rounded px-1.5 py-1 mono text-xs border border-transparent focus:outline-none focus:border-[#7A3B54]/40 focus:ring-2 focus:ring-[#7A3B54]/15"
+                            value={settings.loanLimits[key]}
+                            onChange={(n) => updateSetting({
+                              ...settings,
+                              loanLimits: { ...settings.loanLimits, [key]: n },
+                            })} />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -313,7 +386,7 @@ export default function SettingsModal({
               </h2>
               <textarea
                 rows={3}
-                placeholder="e.g. 'Assign crossover payment periods to the award year of the student's start date, unless remaining eligibility runs out — confirm with [financial aid director] on exceptions.'"
+                placeholder="e.g. 'Assign crossover payment periods to the award year of the student's start date, unless remaining eligibility runs out confirm with financial aid on exceptions.'"
                 className="w-full border border-[#C9C4B8] rounded px-3 py-2 text-sm"
                 value={settings.crossoverNote}
                 onChange={(e) => updateSetting({ ...settings, crossoverNote: e.target.value })}

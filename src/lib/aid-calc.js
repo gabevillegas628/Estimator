@@ -10,6 +10,18 @@ export function formatMoney(n) {
   return sign + "$" + Math.abs(Math.round(n)).toLocaleString("en-US");
 }
 
+// The inverse of formatMoney, for the settings fields. A money input shows
+// "$23,000" when it is not being edited, so whatever comes back out has to
+// survive the dollar sign, the commas, and a half-typed entry. Anything that
+// does not parse is 0 rather than NaN, which would otherwise reach the aid math
+// and poison every figure downstream of it.
+export function parseMoneyInput(raw) {
+  const digits = String(raw ?? "").replace(/[^0-9.]/g, "");
+  if (digits === "" || digits === ".") return 0;
+  const n = Number(digits);
+  return Number.isFinite(n) ? n : 0;
+}
+
 // formatMoney rounds to whole dollars, which is right for the estimate itself
 // but hides the cents that origination fees and amortization actually produce.
 // A step reading "$3,465 × (1 − 1.057%) = $3,428" looks like an arithmetic

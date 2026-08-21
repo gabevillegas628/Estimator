@@ -5,6 +5,8 @@ import {
   buildAidPackage,
   findCrossoverBoundary,
   calculateMonthlyPayment,
+  formatMoney,
+  parseMoneyInput,
 } from "../src/lib/aid-calc.js";
 import { DEFAULT_SETTINGS } from "../shared/defaults.js";
 
@@ -273,5 +275,39 @@ describe("calculateMonthlyPayment", () => {
 
   it("returns zeroes for a fully covered balance", () => {
     expect(calculateMonthlyPayment(0, 5, 18)).toEqual({ payment: 0, totalPaid: 0, totalInterest: 0 });
+  });
+});
+
+describe("parseMoneyInput", () => {
+  it("reads back what formatMoney wrote", () => {
+    // The invariant the settings money fields depend on: a field displays
+    // formatMoney(value) when idle, so parsing that string has to return the
+    // value it came from, or a figure would drift every time the modal opened.
+    for (const n of [0, 740, 7395, 23000, 57500, 138500]) {
+      expect(parseMoneyInput(formatMoney(n))).toBe(n);
+    }
+  });
+
+  it("strips currency punctuation", () => {
+    expect(parseMoneyInput("$23,000")).toBe(23000);
+    expect(parseMoneyInput("23000")).toBe(23000);
+    expect(parseMoneyInput("$1,234.56")).toBe(1234.56);
+  });
+
+  it("treats anything unparseable as zero rather than NaN", () => {
+    // NaN here would reach the aid math and poison every figure downstream,
+    // so half-typed and junk entries have to land on a real number.
+    for (const junk of ["", " ", ".", "abc", "$", "1.2.3", null, undefined]) {
+      const result = parseMoneyInput(junk);
+      expect(Number.isNaN(result)).toBe(false);
+      expect(result).toBe(0);
+    }
+  });
+
+  it("accepts a partially typed entry", () => {
+    // Fires on every keystroke while the field is focused.
+    expect(parseMoneyInput("2")).toBe(2);
+    expect(parseMoneyInput("23")).toBe(23);
+    expect(parseMoneyInput("230")).toBe(230);
   });
 });
