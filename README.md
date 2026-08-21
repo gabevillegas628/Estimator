@@ -23,6 +23,7 @@ src/
     SettingsModal.jsx     School-wide config, in a modal
     PrintDialog.jsx       Collects print-only name / date of birth
     PrintableEstimate.jsx The printed worksheet
+    ShowWorkModal.jsx     Step-by-step trace of how the estimate was reached
   lib/aid-calc.js      Pure aid math — no React, no network. Tested.
   lib/api.js           The only place the client talks to the server
 server/
@@ -40,6 +41,13 @@ The split that matters is `lib/aid-calc.js`: every function in it is
 deterministic on its arguments, which is what makes the regression tests
 possible. Two real bugs have already been found in that logic — both now have
 named tests. Keep UI and network concerns out of it.
+
+That file also emits the step traces behind "Show the work". The per-period
+trace is built *during* the real computation rather than reconstructed
+afterwards, so it cannot drift from the numbers on screen; the `explain*`
+helpers delegate their actual values to the functions they narrate, for the
+same reason. `test/show-work.test.js` pins every step to the figure it
+explains.
 
 ---
 

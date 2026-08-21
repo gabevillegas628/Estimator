@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, TriangleAlert, Info, Lock, LogOut, Eye, EyeOff, Printer } from "lucide-react";
+import { Settings, TriangleAlert, Info, Lock, LogOut, Eye, EyeOff, Printer, Calculator } from "lucide-react";
 
 import {
   formatMoney,
@@ -8,6 +8,9 @@ import {
   buildAidPackage,
   findCrossoverBoundary,
   calculateMonthlyPayment,
+  explainScheduledPell,
+  explainAcademicYearPeriods,
+  explainMonthlyPayment,
   uid,
 } from "./lib/aid-calc.js";
 import { DEFAULT_PROGRAMS, DEFAULT_SETTINGS, DEPENDENCY_CRITERIA } from "../shared/defaults.js";
@@ -15,6 +18,7 @@ import { api, AuthError } from "./lib/api.js";
 import SettingsModal from "./components/SettingsModal.jsx";
 import PrintDialog from "./components/PrintDialog.jsx";
 import PrintableEstimate from "./components/PrintableEstimate.jsx";
+import ShowWorkModal from "./components/ShowWorkModal.jsx";
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
 
@@ -155,6 +159,7 @@ function DownPaymentEstimator({ onSignedOut }) {
   const [studentName, setStudentName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [printOpen, setPrintOpen] = useState(false);
+  const [workOpen, setWorkOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [settingsSavedAt, setSettingsSavedAt] = useState(null);
@@ -366,6 +371,21 @@ function DownPaymentEstimator({ onSignedOut }) {
   const triggersTila = (Number(interestRate) || 0) > 0 || (Number(termMonths) || 0) > 4;
 
   const crossoverBoundary = selectedProgram ? findCrossoverBoundary(startDate, selectedProgram.lengthWeeks) : null;
+
+  // Only built while the panel is open. The per-period trace already rides
+  // along inside aidPackage (it is emitted during the real computation, so it
+  // cannot disagree with the numbers above), but the Pell and payment
+  // narrations are extra work with no reason to run on every keystroke.
+  const showWork =
+    workOpen && aidPackage && selectedProgram
+      ? {
+          pell: explainScheduledPell({
+            sai, maxFlag, minFlag, awardMax: settings.awardYearMax, awardMin: settings.awardYearMin,
+          }),
+          periods: explainAcademicYearPeriods(selectedProgram.clockHours, settings.academicYearHours),
+          payment: explainMonthlyPayment(financedBalance, interestRate, termMonths),
+        }
+      : null;
 
   // These fire on every keystroke in the settings pane. Local state updates
   // immediately so typing stays responsive, while the PATCH is debounced per
@@ -689,9 +709,23 @@ function DownPaymentEstimator({ onSignedOut }) {
         {/* Result card */}
         {selectedProgram && (
           <div className="fade-in bg-white rounded-lg border border-[#DDD8CA] p-5">
-            <div className="flex items-baseline justify-between dotted-rule pb-3 mb-4">
+            <div className="flex items-center justify-between gap-3 dotted-rule pb-3 mb-4">
               <span className="serif text-lg text-[#232530]">{selectedProgram.name}</span>
-              <span className="text-xs text-[#9A9584] mono">{settings.awardYearLabel}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-[#9A9584] mono">{settings.awardYearLabel}</span>
+                {hasResult && (
+                  <button
+                    type="button"
+                    onClick={() => setWorkOpen(true)}
+                    aria-haspopup="dialog"
+                    title="See every step behind these numbers"
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-[#C9C4B8] text-[#6B6656] hover:bg-[#E7E3D8] transition-colors"
+                  >
+                    <Calculator size={14} />
+                    Show the work
+                  </button>
+                )}
+              </div>
             </div>
 
             {!hasResult ? (
@@ -797,9 +831,21 @@ function DownPaymentEstimator({ onSignedOut }) {
         {/* Monthly payment plan */}
         {selectedProgram && hasResult && (
           <div className="fade-in bg-white rounded-lg border border-[#DDD8CA] p-5">
-            <div className="flex items-baseline justify-between dotted-rule pb-3 mb-4 flex-wrap gap-1">
+            <div className="flex items-center justify-between dotted-rule pb-3 mb-4 flex-wrap gap-2">
               <span className="serif text-lg text-[#232530]">Monthly payment plan</span>
-              <span className="text-xs text-[#9A9584]">Balance after down payment, Pell, and loans</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-[#9A9584]">Balance after down payment, Pell, and loans</span>
+                <button
+                  type="button"
+                  onClick={() => setWorkOpen(true)}
+                  aria-haspopup="dialog"
+                  title="See every step behind these numbers"
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-[#C9C4B8] text-[#6B6656] hover:bg-[#E7E3D8] transition-colors"
+                >
+                  <Calculator size={14} />
+                  Show the work
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-end gap-4 mb-4">
@@ -871,6 +917,32 @@ function DownPaymentEstimator({ onSignedOut }) {
         </p>
       </div>
     </div>
+
+    {/* Outside the estimate column, like PrintDialog: that column is a
+        space-y stack, which puts a top margin on every child after the first
+        and would shove a fixed inset-0 overlay down off the top of the screen. */}
+    {showWork && (
+      <ShowWorkModal
+        program={selectedProgram}
+        settings={settings}
+        sai={sai}
+        maxFlag={maxFlag}
+        minFlag={minFlag}
+        isIndependent={isIndependent}
+        parentPlusDenied={parentPlusDenied}
+        useIndependentTable={useIndependentTable}
+        startingGradeLevel={startingGradeLevel}
+        scholarshipAmount={scholarshipAmount}
+        seogAmount={seogAmount}
+        pellExplanation={showWork.pell}
+        periodExplanation={showWork.periods}
+        aidPackage={aidPackage}
+        paymentExplanation={showWork.payment}
+        termMonths={termMonths}
+        interestRate={interestRate}
+        onClose={() => setWorkOpen(false)}
+      />
+    )}
 
     {printOpen && (
       <PrintDialog
