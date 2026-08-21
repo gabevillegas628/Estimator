@@ -138,7 +138,7 @@ export default function ShowWorkModal({
   // .screen-only so the panel never lands on the printout, matching PrintDialog.
   return (
     <div
-      className="screen-only fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 bg-[#232530]/40 backdrop-blur-[2px] overflow-y-auto"
+      className="screen-only fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-[#232530]/40 backdrop-blur-[2px]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -149,9 +149,9 @@ export default function ShowWorkModal({
         aria-modal="true"
         aria-labelledby="show-work-title"
         tabIndex={-1}
-        className="fade-in bg-[#F0EEE8] w-full max-w-3xl rounded-lg border border-[#DDD8CA] shadow-xl focus:outline-none my-auto"
+        className="fade-in bg-[#F0EEE8] w-full max-w-3xl max-h-full flex flex-col rounded-lg border border-[#DDD8CA] shadow-xl focus:outline-none"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#DDD8CA] bg-white rounded-t-lg sticky top-0 z-10">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#DDD8CA] bg-white rounded-t-lg shrink-0">
           <div>
             <h2 id="show-work-title" className="serif text-xl text-[#232530]">
               How this estimate was calculated
@@ -170,7 +170,7 @@ export default function ShowWorkModal({
           </button>
         </div>
 
-        <div className="px-5 py-5 space-y-4">
+        <div className="px-5 py-5 space-y-4 overflow-y-auto grow">
           <section className="bg-white rounded-lg border border-[#DDD8CA] p-4">
             <div className="dotted-rule pb-2.5 mb-3">
               <h3 className="serif text-base text-[#232530]">
@@ -259,7 +259,7 @@ export default function ShowWorkModal({
           </p>
         </div>
 
-        <div className="border-t border-[#DDD8CA] bg-white rounded-b-lg px-5 py-3 flex items-center">
+        <div className="border-t border-[#DDD8CA] bg-white rounded-b-lg px-5 py-3 flex items-center shrink-0">
           <p className="text-xs text-[#9A9584]">Estimate only — not an official award notice.</p>
           <button
             type="button"

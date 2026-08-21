@@ -62,6 +62,23 @@ describe("TermsModal", () => {
     expect(html).toContain('aria-labelledby="terms-title"');
   });
 
+  it("scrolls the body, not the whole panel", () => {
+    // Regression: the overlay used to be the scroll container with a sticky
+    // header, so the panel slid through the viewport and body text passed
+    // through the band above the pinned header. The panel is now a bounded
+    // flex column -- fixed header and footer, scrolling middle.
+    expect(html).not.toContain("sticky");
+    expect(html).not.toContain("my-auto");
+
+    const overlay = html.slice(0, html.indexOf(">") + 1);
+    expect(overlay).not.toContain("overflow-y-auto");
+    expect(overlay).toContain("items-center");
+
+    expect(html).toContain("max-h-full");
+    expect(html).toContain("flex flex-col");
+    expect(html).toContain("overflow-y-auto grow");
+  });
+
   it("drops the file's own H1 so the title is not doubled", () => {
     const occurrences = text.split("Terms of Service").length - 1;
     expect(occurrences).toBe(1);

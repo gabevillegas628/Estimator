@@ -61,6 +61,26 @@ const render = (props) => renderToStaticMarkup(<ShowWorkModal {...props} />);
 const text = (html) => html.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
 describe("ShowWorkModal", () => {
+  it("scrolls the body, not the whole panel", () => {
+    // Regression: the overlay used to be the scroll container with a sticky
+    // header, so the panel slid through the viewport and body content passed
+    // through the band above the pinned header. The panel is now a bounded
+    // flex column -- fixed header and footer, scrolling middle -- matching
+    // SettingsModal, which had it right all along.
+    const html = render(worksheetWork());
+
+    expect(html).not.toContain("sticky");
+    expect(html).not.toContain("my-auto");
+
+    const overlay = html.slice(0, html.indexOf(">") + 1);
+    expect(overlay).not.toContain("overflow-y-auto");
+    expect(overlay).toContain("items-center");
+
+    expect(html).toContain("max-h-full");
+    expect(html).toContain("flex flex-col");
+    expect(html).toContain("overflow-y-auto grow");
+  });
+
   it("walks through every stage of the calculation", () => {
     const t = text(render(worksheetWork()));
     expect(t).toMatch(/What went in/);

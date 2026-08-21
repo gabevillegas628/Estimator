@@ -111,7 +111,7 @@ export default function TermsModal({ onClose }) {
   // PrintDialog and ShowWorkModal.
   return (
     <div
-      className="screen-only fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 bg-[#232530]/40 backdrop-blur-[2px] overflow-y-auto"
+      className="screen-only fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-[#232530]/40 backdrop-blur-[2px]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -122,9 +122,9 @@ export default function TermsModal({ onClose }) {
         aria-modal="true"
         aria-labelledby="terms-title"
         tabIndex={-1}
-        className="fade-in bg-[#F0EEE8] w-full max-w-2xl rounded-lg border border-[#DDD8CA] shadow-xl focus:outline-none my-auto"
+        className="fade-in bg-[#F0EEE8] w-full max-w-2xl max-h-full flex flex-col rounded-lg border border-[#DDD8CA] shadow-xl focus:outline-none"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#DDD8CA] bg-white rounded-t-lg sticky top-0 z-10">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#DDD8CA] bg-white rounded-t-lg shrink-0">
           <div>
             <h2 id="terms-title" className="serif text-xl text-[#232530]">
               Terms of Service
@@ -143,7 +143,7 @@ export default function TermsModal({ onClose }) {
           </button>
         </div>
 
-        <div className="px-5 py-5">
+        <div className="px-5 py-5 overflow-y-auto grow">
           <div className="bg-white rounded-lg border border-[#DDD8CA] p-5">
             {BLOCKS.map((block, i) => {
               // The file's own H1 duplicates the modal header above.
@@ -179,7 +179,7 @@ export default function TermsModal({ onClose }) {
           </div>
         </div>
 
-        <div className="border-t border-[#DDD8CA] bg-white rounded-b-lg px-5 py-3 flex items-center">
+        <div className="border-t border-[#DDD8CA] bg-white rounded-b-lg px-5 py-3 flex items-center shrink-0">
           <p className="text-xs text-[#9A9584]">Estimate only — not an official award notice.</p>
           <button
             type="button"
