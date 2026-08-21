@@ -607,9 +607,33 @@ function FinancialAidEstimator({ onSignedOut }) {
             <div className="text-sm text-[#5A2540]">
               <span className="font-medium">This enrollment crosses a Pell award year boundary</span> (around{" "}
               {crossoverBoundary.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}).
-              Which award year's Pell figures apply is a policy call, not something this tool decides —
-              check the crossover policy note in Settings. This is separate from the loan periods below,
-              which follow the program's academic year, not the award year.
+              Which award year's Pell figures apply is a policy call, not something this tool decides.
+              This is separate from the loan periods below, which follow the program's academic year,
+              not the award year.
+
+              {/* The policy note is authored in Settings but belongs here, at the
+                  one moment it is relevant. Pointing staff at another screen to
+                  go find it was advice they had to act on to use. */}
+              {settings.crossoverNote?.trim() ? (
+                <div className="mt-2.5 border-l-2 border-[#7A3B54]/40 pl-3">
+                  <div className="text-[10px] uppercase tracking-wide font-medium text-[#7A3B54] mb-0.5">
+                    Crossover policy
+                  </div>
+                  <div className="whitespace-pre-line">{settings.crossoverNote.trim()}</div>
+                </div>
+              ) : (
+                <div className="mt-2.5 text-xs text-[#7A3B54]">
+                  No crossover policy has been recorded yet —{" "}
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(true)}
+                    className="underline underline-offset-2 hover:text-[#5A2540] transition-colors"
+                  >
+                    add one in Settings
+                  </button>{" "}
+                  and it will appear here.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -682,7 +706,7 @@ function FinancialAidEstimator({ onSignedOut }) {
 
             <div className="flex flex-wrap items-end gap-4">
               <div>
-                <label className="text-xs text-[#9A9584]">Starting grade level</label>
+                <label className="text-xs text-[#9A9584]">Starting grade level: </label>
                 <select
                   value={startingGradeLevel}
                   onChange={(e) => setStartingGradeLevel(Number(e.target.value))}
@@ -692,14 +716,14 @@ function FinancialAidEstimator({ onSignedOut }) {
                   <option value={2}>Year 2 (transfer/re-entry)</option>
                   <option value={3}>Year 3+ (transfer/re-entry)</option>
                 </select>
-                <p className="text-[10px] text-[#9A9584] mt-1 max-w-[220px]">Later periods auto-progress a grade level each time an academic year completes.</p>
-              </div>
-              {!isIndependent && (
+                {!isIndependent && (
                 <label className="flex items-center gap-2 text-sm mb-1.5">
                   <input type="checkbox" checked={parentPlusDenied} onChange={(e) => setParentPlusDenied(e.target.checked)} />
                   Parent denied a Direct PLUS Loan
                 </label>
-              )}
+                )}
+                <p className="text-[10px] text-[#9A9584] mt-1 max-w-[220px]">Later periods auto-progress a grade level each time an academic year completes.</p>
+              </div>
               <div className="text-sm ml-auto">
                 <span className="text-[#9A9584]">Dependency status:</span>{" "}
                 <span className="serif text-[#7A3B54]">{isIndependent ? "Independent" : parentPlusDenied ? "Dependent (PLUS denied)" : "Dependent"}</span>
