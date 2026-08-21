@@ -1,4 +1,4 @@
-# Down Payment Estimator
+# Financial Aid Estimator
 
 Internal staff tool for a cosmetology school's merged admissions/financial aid
 department. Given a student's SAI, program, and dependency status, it estimates

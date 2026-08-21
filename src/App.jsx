@@ -60,7 +60,7 @@ function LoginScreen({ onAuthenticated }) {
             <Lock size={16} />
             <span className="text-xs uppercase tracking-wide font-medium">Staff only</span>
           </div>
-          <h1 className="serif text-2xl font-medium tracking-tight mt-2">Down Payment Estimator</h1>
+          <h1 className="serif text-2xl font-medium tracking-tight mt-2">Financial Aid Estimator</h1>
           <p className="text-sm text-[#6B6656] mt-1">Enter the department password to continue.</p>
 
           <div className="relative mt-4">
@@ -138,10 +138,10 @@ export default function App() {
 
   if (!authenticated) return <LoginScreen onAuthenticated={handleAuthenticated} />;
 
-  return <DownPaymentEstimator onSignedOut={handleSignedOut} />;
+  return <FinancialAidEstimator onSignedOut={handleSignedOut} />;
 }
 
-function DownPaymentEstimator({ onSignedOut }) {
+function FinancialAidEstimator({ onSignedOut }) {
   const [programs, setPrograms] = useState(DEFAULT_PROGRAMS);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
@@ -461,7 +461,7 @@ function DownPaymentEstimator({ onSignedOut }) {
       <div className="border-b border-[#C9C4B8] bg-[#F0EEE8]/95 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
           <div>
-            <h1 className="serif text-2xl font-medium tracking-tight text-[#232530]">Down Payment Estimator</h1>
+            <h1 className="serif text-2xl font-medium tracking-tight text-[#232530]">Financial Aid Estimator</h1>
             <p className="text-xs text-[#6B6656] mt-0.5">Staff tool — estimate only, not an official award</p>
           </div>
           <div className="flex items-center gap-2">
