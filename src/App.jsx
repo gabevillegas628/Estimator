@@ -19,6 +19,7 @@ import SettingsModal from "./components/SettingsModal.jsx";
 import PrintDialog from "./components/PrintDialog.jsx";
 import PrintableEstimate from "./components/PrintableEstimate.jsx";
 import ShowWorkModal from "./components/ShowWorkModal.jsx";
+import TermsModal from "./components/TermsModal.jsx";
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
 
@@ -161,6 +162,7 @@ function FinancialAidEstimator({ onSignedOut }) {
   const [printOpen, setPrintOpen] = useState(false);
   const [workOpen, setWorkOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [settingsSavedAt, setSettingsSavedAt] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -915,6 +917,18 @@ function FinancialAidEstimator({ onSignedOut }) {
           Estimate only — not an official award or financial aid offer. Verification, R2T4 refund calculations,
           and satisfactory-progress holds still go through financial aid staff.
         </p>
+
+        <p className="text-xs text-[#9A9584] text-center pt-2 pb-1">
+          © 2026 Wildtype Technologies LLC
+          <span aria-hidden="true"> · </span>
+          <button
+            type="button"
+            onClick={() => setTermsOpen(true)}
+            className="underline underline-offset-2 hover:text-[#232530] transition-colors"
+          >
+            Terms
+          </button>
+        </p>
       </div>
     </div>
 
@@ -943,6 +957,8 @@ function FinancialAidEstimator({ onSignedOut }) {
         onClose={() => setWorkOpen(false)}
       />
     )}
+
+    {termsOpen && <TermsModal onClose={() => setTermsOpen(false)} />}
 
     {printOpen && (
       <PrintDialog
