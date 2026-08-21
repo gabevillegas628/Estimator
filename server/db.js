@@ -4,11 +4,20 @@ import { migrate } from "./migrate.js";
 
 const { Pool } = pg;
 
-const connectionString = process.env.DATABASE_URL;
+// Railway's Postgres plugin publishes both names: DATABASE_URL points at the
+// private network and only resolves from inside Railway, DATABASE_PUBLIC_URL at
+// the TLS proxy and works from anywhere. Accept either so that pointing a local
+// checkout at a hosted database does not require renaming the variable.
+const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
 if (!connectionString) {
   throw new Error(
-    "DATABASE_URL is not set. On Railway, add the Postgres plugin and reference it as ${{Postgres.DATABASE_URL}}; locally, copy .env.example to .env."
+    "Neither DATABASE_URL nor DATABASE_PUBLIC_URL is set. On Railway, add the Postgres plugin and reference it as ${{Postgres.DATABASE_URL}}; locally, copy .env.example to .env."
   );
+}
+if (!process.env.DATABASE_URL && process.env.NODE_ENV === "production") {
+  // Reaching a database over the public proxy from inside Railway works but
+  // leaves the private network for no reason, so say so rather than hiding it.
+  console.warn("[db] using DATABASE_PUBLIC_URL in production — prefer DATABASE_URL for the private network");
 }
 
 // Railway's private network (*.railway.internal) does not use TLS; its public
