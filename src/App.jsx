@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ChevronDown, ChevronUp, TriangleAlert, Info, Lock, LogOut, Eye, EyeOff } from "lucide-react";
+import { Settings, TriangleAlert, Info, Lock, LogOut, Eye, EyeOff, Printer } from "lucide-react";
 
 import {
   formatMoney,
@@ -13,6 +13,8 @@ import {
 import { DEFAULT_PROGRAMS, DEFAULT_SETTINGS, DEPENDENCY_CRITERIA } from "../shared/defaults.js";
 import { api, AuthError } from "./lib/api.js";
 import SettingsModal from "./components/SettingsModal.jsx";
+import PrintDialog from "./components/PrintDialog.jsx";
+import PrintableEstimate from "./components/PrintableEstimate.jsx";
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
 
@@ -146,6 +148,13 @@ function DownPaymentEstimator({ onSignedOut }) {
   const [maxFlag, setMaxFlag] = useState(false);
   const [minFlag, setMinFlag] = useState(false);
   const [startDate, setStartDate] = useState("");
+  // Per-student grant aid. Never persisted, same as SAI.
+  const [scholarship, setScholarship] = useState("");
+  const [seog, setSeog] = useState("");
+  // Printout-only identity fields. Never sent anywhere; see PrintDialog.
+  const [studentName, setStudentName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [printOpen, setPrintOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [settingsSavedAt, setSettingsSavedAt] = useState(null);
@@ -337,9 +346,14 @@ function DownPaymentEstimator({ onSignedOut }) {
   const downPaymentOverage = Math.max(period0Pell - downPayment, 0);
   const coveragePct = downPayment > 0 ? Math.min(100, (period0Pell / downPayment) * 100) : 0;
 
+  const scholarshipAmount = Math.max(Number(scholarship) || 0, 0);
+  const seogAmount = Math.max(Number(seog) || 0, 0);
+  const otherGrantAid = scholarshipAmount + seogAmount;
+
   const aidPackage = hasResult
     ? buildAidPackage({
         periods, totalProgramHours: selectedProgram.clockHours, totalCost, downPayment, scheduledPell,
+        otherGrantAid,
         startingGradeLevel, useIndependentTable, loanLimits: settings.loanLimits,
         originationFeePct: settings.originationFeePct,
       })
@@ -411,7 +425,8 @@ function DownPaymentEstimator({ onSignedOut }) {
   };
 
   return (
-    <div style={{ fontFamily: "'IBM Plex Sans', sans-serif" }} className="min-h-screen bg-[#F0EEE8] text-[#232530] pb-16">
+    <>
+    <div style={{ fontFamily: "'IBM Plex Sans', sans-serif" }} className="screen-only min-h-screen bg-[#F0EEE8] text-[#232530] pb-16">
       <style>{`
         ${FONT_IMPORT}
         .serif { font-family: 'Newsreader', serif; }
@@ -431,13 +446,21 @@ function DownPaymentEstimator({ onSignedOut }) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setSettingsOpen((s) => !s)}
+              onClick={() => setPrintOpen(true)}
+              disabled={!hasResult}
+              title={hasResult ? "Print estimate" : "Enter an SAI to produce an estimate first"}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-[#C9C4B8] hover:bg-[#E7E3D8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Printer size={15} />
+              Print
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-[#C9C4B8] hover:bg-[#E7E3D8] transition-colors"
-              aria-expanded={settingsOpen}
+              aria-haspopup="dialog"
             >
               <Settings size={15} />
               Settings
-              {settingsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
             </button>
             <button
               onClick={signOut}
@@ -509,6 +532,49 @@ function DownPaymentEstimator({ onSignedOut }) {
               <input type="checkbox" checked={minFlag} disabled={maxFlag} onChange={(e) => setMinFlag(e.target.checked)} />
               Min Pell Indicator (ISIR)
             </label>
+          </div>
+
+          {/* Other grant aid. Like SAI, these are per-student and never saved —
+              they exist only in this component's state. */}
+          <div className="dotted-rule pt-4 -mt-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="scholarship" className="text-sm font-medium text-[#232530]">Scholarship</label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#9A9584] mono">$</span>
+                  <input
+                    id="scholarship"
+                    type="number"
+                    min="0"
+                    value={scholarship}
+                    onChange={(e) => setScholarship(e.target.value)}
+                    placeholder="0"
+                    className="w-full border border-[#C9C4B8] rounded-md pl-7 pr-3 py-2 text-sm mono focus:outline-none focus:ring-2 focus:ring-[#7A3B54]/40"
+                  />
+                </div>
+                <p className="text-xs text-[#9A9584] mt-1">Institutional award, if any</p>
+              </div>
+              <div>
+                <label htmlFor="seog" className="text-sm font-medium text-[#232530]">SEOG</label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#9A9584] mono">$</span>
+                  <input
+                    id="seog"
+                    type="number"
+                    min="0"
+                    value={seog}
+                    onChange={(e) => setSeog(e.target.value)}
+                    placeholder="0"
+                    className="w-full border border-[#C9C4B8] rounded-md pl-7 pr-3 py-2 text-sm mono focus:outline-none focus:ring-2 focus:ring-[#7A3B54]/40"
+                  />
+                </div>
+                <p className="text-xs text-[#9A9584] mt-1">Supplemental Educational Opportunity Grant</p>
+              </div>
+            </div>
+            <p className="text-xs text-[#9A9584] mt-2">
+              Both are grant aid: they reduce the balance before any borrowing, so a student whose need falls below the
+              loan ceilings borrows less rather than finishing with a credit.
+            </p>
           </div>
         </div>
 
@@ -669,6 +735,16 @@ function DownPaymentEstimator({ onSignedOut }) {
                         Charge: {formatMoney(r.tuitionSlice)}
                         {r.downPaymentCharge > 0 && ` (includes ${formatMoney(r.downPaymentCharge)} down payment)`}
                       </div>
+                      {r.grants > 0 && (
+                        <div className="text-xs text-[#4A7C59] mb-2">
+                          Grant aid applied: {formatMoney(r.grants)}
+                          {scholarshipAmount > 0 && seogAmount > 0
+                            ? ` (${formatMoney(scholarshipAmount)} scholarship + ${formatMoney(seogAmount)} SEOG)`
+                            : scholarshipAmount > 0
+                            ? " (scholarship)"
+                            : " (SEOG)"}
+                        </div>
+                      )}
                       <div className="grid grid-cols-3 gap-2 text-sm">
                         <div>
                           <div className="text-[10px] text-[#9A9584]">Pell</div>
@@ -795,5 +871,36 @@ function DownPaymentEstimator({ onSignedOut }) {
         </p>
       </div>
     </div>
+
+    {printOpen && (
+      <PrintDialog
+        studentName={studentName}
+        setStudentName={setStudentName}
+        dateOfBirth={dateOfBirth}
+        setDateOfBirth={setDateOfBirth}
+        onClose={() => setPrintOpen(false)}
+      />
+    )}
+
+    {/* Sibling of the app shell, not a child: the shell is display:none when
+        printing, which would take the worksheet down with it. */}
+    <PrintableEstimate
+      studentName={studentName}
+      dateOfBirth={dateOfBirth}
+      sai={sai}
+      maxFlag={maxFlag}
+      startDate={startDate}
+      program={selectedProgram}
+      isIndependent={isIndependent}
+      parentPlusDenied={parentPlusDenied}
+      aidPackage={aidPackage}
+      settings={settings}
+      scholarshipAmount={scholarshipAmount}
+      seogAmount={seogAmount}
+      termMonths={termMonths}
+      monthlyPayment={monthlyPayment}
+      interestRate={interestRate}
+    />
+    </>
   );
 }

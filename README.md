@@ -20,7 +20,9 @@ one covers *how to run it*.
 src/
   App.jsx              Login gate + the estimator UI
   components/
-    SettingsModal.jsx  School-wide config, in a modal
+    SettingsModal.jsx     School-wide config, in a modal
+    PrintDialog.jsx       Collects print-only name / date of birth
+    PrintableEstimate.jsx The printed worksheet
   lib/aid-calc.js      Pure aid math — no React, no network. Tested.
   lib/api.js           The only place the client talks to the server
 server/
@@ -138,6 +140,41 @@ In production a single process serves both the API and the built static files,
 so there is one service and one port.
 
 ---
+
+## The printed estimate
+
+"Print" in the header produces a worksheet modelled on the school's paper
+"Estimated Financial Aid Worksheet", so staff can read the two side by side.
+
+There is no PDF library. The worksheet is rendered into the page hidden and
+swapped in under `@media print`, so the browser's own **Save as PDF** produces
+the file. Nothing is added to the bundle and the server does not need a headless
+browser. The print rules live in `src/index.css`; `.screen-only` and
+`.print-only` do the swapping.
+
+Two deliberate differences from the paper sheet:
+
+- **No school branding.** The tool is not endorsed by the school and its figures
+  differ from the official worksheet by a few dollars (see rounding, below), so
+  the printout must not look like something the school issued. The header is a
+  placeholder box.
+- **Scholarship and SEOG print above the adjusted total**, not at the foot of
+  the page. That is where they are actually applied — see the note in
+  `aid-calc.js` — and printing them where the paper sheet puts them would
+  misrepresent the arithmetic.
+
+Student name and date of birth are collected in the print dialog. They live in
+component state, appear only on the printout, and are never sent anywhere; the
+database has no column that could hold them.
+
+### Known rounding difference
+
+`aid-calc.js` rounds Pell and prorated loan ceilings to the nearest **$5**. Both
+worksheets the school has supplied round to the **dollar**. The effect is a few
+dollars per line — for the validated dependent student, a total balance of
+$5,342 against the sheet's $5,338, though the monthly payment matches exactly at
+$534. This is unresolved and worth confirming with financial aid before the
+figures are relied on for an exact quote.
 
 ## Access control
 

@@ -169,6 +169,58 @@ describe("buildAidPackage", () => {
     expect(rows[1].unsubGross).toBe(0);
   });
 
+  it("applies scholarship/SEOG as grant aid, dollar for dollar off the balance", () => {
+    // High tuition, so both loans are ceiling-capped and the grant has nowhere
+    // to go but the balance.
+    const expensive = { ...worksheet, totalCost: 25000 };
+    const withGrant = buildAidPackage({ ...expensive, otherGrantAid: 1500 });
+    const without = buildAidPackage(expensive);
+
+    expect(withGrant.rows[0].grants).toBe(1500);
+    expect(withGrant.totals.grants).toBe(1500);
+    expect(withGrant.totals.remainingBalance).toBeCloseTo(without.totals.remainingBalance - 1500, 6);
+    // Borrowing is untouched, because it was already at the ceiling.
+    expect(withGrant.rows[0].subGross).toBe(3500);
+    expect(withGrant.rows[0].unsubGross).toBe(6000);
+  });
+
+  it("reduces borrowing when a grant brings need below the loan ceilings", () => {
+    // REGRESSION: the paper worksheet lists scholarships below the loan rows.
+    // Doing that literally would have this student borrow the full ceiling and
+    // finish with a credit balance, paying interest on money they already had.
+    const cheap = {
+      ...worksheet,
+      periods: computeAcademicYearPeriods(900, 900),
+      totalProgramHours: 900,
+      totalCost: 12000,
+      useIndependentTable: false,
+    };
+    const withGrant = buildAidPackage({ ...cheap, otherGrantAid: 3000 });
+    const without = buildAidPackage({ ...cheap });
+
+    // Roughly $1,100 less borrowed, rather than the same borrowing plus a
+    // $3,000 credit balance that the worksheet's bottom-of-page layout implies.
+    expect(withGrant.rows[0].subGross).toBeLessThan(without.rows[0].subGross);
+    expect(without.rows[0].subGross - withGrant.rows[0].subGross).toBeGreaterThan(1000);
+    // Settles at zero (bar the origination-fee residual), never a credit.
+    expect(withGrant.totals.remainingBalance).toBeGreaterThanOrEqual(0);
+    expect(withGrant.totals.remainingBalance).toBeLessThan(1);
+  });
+
+  it("carries a grant larger than period 1's charge forward instead of losing it", () => {
+    const { rows } = buildAidPackage({ ...worksheet, totalCost: 4000, otherGrantAid: 5000 });
+    expect(rows[0].remainingBalance).toBe(0);
+    expect(rows[1].remainingBalance).toBe(0);
+    expect(rows[1].subGross).toBe(0);
+  });
+
+  it("defaults to no grant aid when the argument is omitted", () => {
+    const omitted = buildAidPackage({ ...worksheet });
+    const explicitZero = buildAidPackage({ ...worksheet, otherGrantAid: 0 });
+    expect(omitted.totals.remainingBalance).toBe(explicitZero.totals.remainingBalance);
+    expect(omitted.totals.grants).toBe(0);
+  });
+
   it("stops grade-level progression at year 3", () => {
     const { rows } = buildAidPackage({
       ...worksheet,

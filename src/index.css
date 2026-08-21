@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+/* The printed estimate is a separate document from the app. Rather than pull in
+   a PDF library, the printable worksheet is rendered into the page hidden and
+   swapped in for print, so the browser's own "Save as PDF" produces it. No
+   dependency, nothing added to the bundle, no headless browser on the server. */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  /* Inches, since the sheet is US Letter and the school's own worksheet is
+     laid out in them. The browser only honours this when its print dialog has
+     Margins set to Default — "None" overrides it and prints edge to edge, which
+     is why the print dialog says to leave it alone. */
+  @page {
+    size: letter portrait;
+    margin: 0.75in;
+  }
+
+  /* Hide the application chrome, show the worksheet. */
+  .screen-only {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Printers drop background fills by default, which would take the shaded
+     total rows with them. Force them to render. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Never split a labelled figure away from its value. */
+  tr,
+  .avoid-break {
+    break-inside: avoid;
+  }
+}

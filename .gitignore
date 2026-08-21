@@ -27,3 +27,8 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Source documents from the school. EstimateTemplate.pdf is a real student's
+# worksheet with only the name redacted — SAI, program, dates and amounts are
+# intact, and it carries school branding. This repo is public; keep it local.
+*.pdf

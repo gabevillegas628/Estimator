@@ -36,14 +36,23 @@ export function computeAcademicYearPeriods(programHours, academicYearHours) {
   return periods;
 }
 
-// Builds the period-by-period aid package: Pell first, then Subsidized, then
-// Unsubsidized, each capped at the lesser of its own ceiling or remaining need
-// for that specific period. Overage from one period (e.g. Pell exceeding a
-// period's need) carries forward to reduce the next period's need. "downPayment"
-// (books/kit or similar) is a CHARGE added to Period 1's total, same as tuition —
-// Pell reduces the combined Period-1 charge in one shot, with no special
-// sequencing for the down-payment portion, matching how these worksheets work.
-export function buildAidPackage({ periods, totalProgramHours, totalCost, downPayment, scheduledPell, startingGradeLevel, useIndependentTable, loanLimits, originationFeePct }) {
+// Builds the period-by-period aid package: grants first (Pell, then any
+// scholarship/SEOG), then Subsidized, then Unsubsidized, each capped at the
+// lesser of its own ceiling or remaining need for that specific period. Overage
+// from one period (e.g. Pell exceeding a period's need) carries forward to
+// reduce the next period's need. "downPayment" (books/kit or similar) is a
+// CHARGE added to Period 1's total, same as tuition — Pell reduces the combined
+// Period-1 charge in one shot, with no special sequencing for the down-payment
+// portion, matching how these worksheets work.
+//
+// otherGrantAid covers institutional scholarships and SEOG. It is grant money,
+// so it reduces need BEFORE any borrowing, alongside Pell. The school's paper
+// worksheet lists scholarships at the bottom, after the loan rows, but that
+// only produces the same answer when both loans hit their ceilings. When need
+// is below the ceilings, subtracting a scholarship after the fact has the
+// student borrow against money they already have and finish with a credit
+// balance — so grants go first here regardless of where the sheet prints them.
+export function buildAidPackage({ periods, totalProgramHours, totalCost, downPayment, scheduledPell, otherGrantAid = 0, startingGradeLevel, useIndependentTable, loanLimits, originationFeePct }) {
   const feeRate = (Number(originationFeePct) || 0) / 100;
   const bucket = useIndependentTable ? loanLimits.independent : loanLimits.dependent;
   let creditPool = 0;
@@ -63,7 +72,12 @@ export function buildAidPackage({ periods, totalProgramHours, totalCost, downPay
     const downPaymentCharge = i === 0 ? Number(downPayment) || 0 : 0;
     const tuitionSlice = totalCost * hoursShare + downPaymentCharge;
 
-    let need = tuitionSlice - pell - creditPool;
+    // Scholarship/SEOG land wholly on the first period. Anything left over
+    // rides the same creditPool that carries Pell overage, so a grant larger
+    // than period 1's charge is not lost — it reduces period 2 instead.
+    const grants = i === 0 ? Number(otherGrantAid) || 0 : 0;
+
+    let need = tuitionSlice - pell - grants - creditPool;
     creditPool = 0;
     if (need < 0) {
       creditPool = -need;
@@ -80,7 +94,7 @@ export function buildAidPackage({ periods, totalProgramHours, totalCost, downPay
 
     return {
       index: i, gradeLevel, hours: period.hours, fraction: period.fraction,
-      pell, subCeiling, unsubCeiling, subGross, subNet, unsubGross, unsubNet,
+      pell, grants, subCeiling, unsubCeiling, subGross, subNet, unsubGross, unsubNet,
       tuitionSlice, downPaymentCharge, remainingBalance: need,
     };
   });
@@ -88,13 +102,14 @@ export function buildAidPackage({ periods, totalProgramHours, totalCost, downPay
   const totals = rows.reduce(
     (acc, r) => ({
       pell: acc.pell + r.pell,
+      grants: acc.grants + r.grants,
       subNet: acc.subNet + r.subNet,
       unsubNet: acc.unsubNet + r.unsubNet,
       subGross: acc.subGross + r.subGross,
       unsubGross: acc.unsubGross + r.unsubGross,
       remainingBalance: acc.remainingBalance + r.remainingBalance,
     }),
-    { pell: 0, subNet: 0, unsubNet: 0, subGross: 0, unsubGross: 0, remainingBalance: 0 }
+    { pell: 0, grants: 0, subNet: 0, unsubNet: 0, subGross: 0, unsubGross: 0, remainingBalance: 0 }
   );
 
   return { rows, totals };
