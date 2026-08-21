@@ -916,27 +916,6 @@ function FinancialAidEstimator({ onSignedOut }) {
           </div>
         )}
 
-        {/* Settings lives in a modal rather than an accordion at the foot of
-            the page: its trigger is in the header, and opening a panel 800px
-            below the button looked like nothing had happened. */}
-        {settingsOpen && (
-          <SettingsModal
-            settings={settings}
-            updateSetting={updateSetting}
-            programs={programs}
-            updateProgramField={updateProgramField}
-            addProgram={addProgram}
-            removeProgram={removeProgram}
-            resetPrograms={resetPrograms}
-            settingsDirty={settingsDirty}
-            settingsSavedAt={settingsSavedAt}
-            savingSettings={savingSettings}
-            onSave={saveAllSettings}
-            onDiscard={discardSettingChanges}
-            onClose={() => setSettingsOpen(false)}
-          />
-        )}
-
         <p className="text-xs text-[#9A9584] text-center pt-4">
           Estimate only — not an official award or financial aid offer. Verification, R2T4 refund calculations,
           and satisfactory-progress holds still go through financial aid staff.
@@ -955,6 +934,32 @@ function FinancialAidEstimator({ onSignedOut }) {
         </p>
       </div>
     </div>
+
+    {/* Settings lives in a modal rather than an accordion at the foot of the
+        page: its trigger is in the header, and opening a panel 800px below the
+        button looked like nothing had happened.
+
+        Out here with the other overlays for the reason below. It used to render
+        inside the estimate column, where space-y-5 gave its fixed inset-0
+        backdrop a 20px top margin -- enough to push the blur down and leave a
+        strip along the bottom of the screen unblurred. */}
+    {settingsOpen && (
+      <SettingsModal
+        settings={settings}
+        updateSetting={updateSetting}
+        programs={programs}
+        updateProgramField={updateProgramField}
+        addProgram={addProgram}
+        removeProgram={removeProgram}
+        resetPrograms={resetPrograms}
+        settingsDirty={settingsDirty}
+        settingsSavedAt={settingsSavedAt}
+        savingSettings={savingSettings}
+        onSave={saveAllSettings}
+        onDiscard={discardSettingChanges}
+        onClose={() => setSettingsOpen(false)}
+      />
+    )}
 
     {/* Outside the estimate column, like PrintDialog: that column is a
         space-y stack, which puts a top margin on every child after the first
