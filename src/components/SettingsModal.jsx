@@ -216,19 +216,27 @@ export default function SettingsModal({
 
             <div className="dotted-rule pt-5">
               <h2 className="serif text-lg mb-3">Financing defaults</h2>
-              <div className="grid grid-cols-3 gap-3 text-sm w-96">
-                <div>
-                  <label className="text-xs text-[#9A9584]">Default term (months)</label>
+              {/* Full width, matching Award year figures above. At w-96 these
+                  three columns were ~120px, which only "Loan origination fee
+                  (%)" failed to fit — it wrapped to two lines and dropped its
+                  input below the other two.
+
+                  Each cell is a flex column with a growing label so the inputs
+                  bottom-align regardless: the grid stays three-up on a phone,
+                  where any of these labels can still wrap. */}
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="flex flex-col">
+                  <label className="text-xs text-[#9A9584] grow">Default term (months)</label>
                   <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.defaultTermMonths}
                     onChange={(e) => updateSetting({ ...settings, defaultTermMonths: Number(e.target.value) })} />
                 </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Default rate (% APR)</label>
+                <div className="flex flex-col">
+                  <label className="text-xs text-[#9A9584] grow">Default rate (% APR)</label>
                   <input type="number" step={0.1} className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.defaultInterestRate}
                     onChange={(e) => updateSetting({ ...settings, defaultInterestRate: Number(e.target.value) })} />
                 </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Loan origination fee (%)</label>
+                <div className="flex flex-col">
+                  <label className="text-xs text-[#9A9584] grow">Origination fee (%)</label>
                   <input type="number" step={0.001} className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.originationFeePct}
                     onChange={(e) => updateSetting({ ...settings, originationFeePct: Number(e.target.value) })} />
                 </div>
