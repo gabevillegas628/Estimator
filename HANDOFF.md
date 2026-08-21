@@ -5,33 +5,34 @@ department. Given a student's SAI, program, and dependency status, it estimates
 Pell Grant, federal loan eligibility, down payment gap, and a monthly payment
 plan for whatever's left. **Estimate only — not a system of record.**
 
-Single file: `down-payment-estimator.jsx`. React + Tailwind, no external state
-management, no backend beyond the storage calls described below.
+React + Tailwind on Vite, with a small Express + Postgres backend. See
+[README.md](README.md) for setup, environment variables, and deployment; this
+document covers the domain reasoning behind the math.
 
 ---
 
-## ⚠️ Read this before doing anything else
+## Status: the artifact-era caveats are resolved
 
-This file was built and run as a Claude.ai artifact, which provides a
-`window.storage` API (async get/set/delete, personal or shared) for free.
-**That API does not exist outside Claude.ai.** Right now:
+This tool began as a Claude.ai artifact using `window.storage`, with no build
+toolchain. Both are now dealt with, and the notes that used to head this file
+are superseded:
 
-- `programs` and `school-settings` are persisted via `window.storage.set(..., true)`
-  (shared = visible to everyone who opens the tool).
-- All calls are wrapped in try/catch that silently falls back to in-memory
-  defaults on failure — so outside Claude.ai it won't crash, it'll just never
-  persist anything and reset on every reload.
+- **Persistence** is Postgres, behind an Express API. The four
+  `window.storage.*` calls are gone; the client now talks to `src/lib/api.js`
+  and nothing else. `programs` is a real table written per row; `settings` is a
+  singleton JSONB row. Data shapes below are unchanged.
+- **Build toolchain** is Vite + Tailwind v4 + `lucide-react`, one Railway
+  service serving both API and static build.
+- **Access control** is a shared staff password over the whole tool. It did not
+  exist before and is not optional on a public URL.
+- **The aid math now has tests.** It moved out of the component into
+  `src/lib/aid-calc.js`, and the two bugs described below — the Pell cap and
+  the conflated proration ratios — have named regression tests in
+  `test/aid-calc.test.js`. The "worth a regression test if this logic ever
+  moves" note below has been acted on.
 
-Before this goes anywhere real, replace the four `window.storage.*` calls
-(search for `window.storage` — there are two `get`s in the load effect and
-two `set`s in `persistPrograms`/`persistSettings`) with a real persistence
-layer (localStorage for a quick local version, or a proper backend if
-multiple staff need to see the same program list live). The data shapes
-they read/write are documented below, so the swap should be mechanical.
-
-Also not currently set up: a build toolchain. This is raw JSX assuming
-Tailwind classes resolve and `lucide-react` is importable — you'll need
-Vite/CRA/Next + Tailwind configured, or an equivalent, to run it standalone.
+The original single-file version is preserved as `down-payment-estimator.jsx`
+for reference. It is no longer the source of truth and is not built or served.
 
 ---
 
@@ -83,7 +84,7 @@ Vite/CRA/Next + Tailwind configured, or an equivalent, to run it standalone.
 
 ---
 
-## Core functions (in file order)
+## Core functions (all in `src/lib/aid-calc.js`)
 
 - **`calculateScheduledPell`** — `Max Pell − SAI`, rounded to nearest $5,
   **capped at Max Pell** (SAI can go to −$1,500, which without the cap
@@ -141,8 +142,10 @@ calculation path, and the comment in the code says so explicitly.
   (`period.fraction`, i.e. `period.hours / academicYearHours`).
 
 These are only equal when the program is exactly one academic year long.
-Conflating them was a second bug caught mid-build — worth a regression test
-if this logic ever moves.
+Conflating them was a second bug caught mid-build. It is now pinned by the
+`"prorates tuition by program-hours share, NOT by academic-year fraction"`
+test, which asserts both the correct figure and the specific wrong one the
+bug produced.
 
 ---
 
