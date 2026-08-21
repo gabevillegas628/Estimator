@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, TriangleAlert, Info, Lock, LogOut, Eye, EyeOff, Printer, Calculator } from "lucide-react";
+import { Settings, TriangleAlert, Info, Lock, LogOut, Eye, EyeOff, Printer, Calculator, ClipboardCopy, Check } from "lucide-react";
 
 import {
   formatMoney,
@@ -20,10 +20,30 @@ import PrintDialog from "./components/PrintDialog.jsx";
 import PrintableEstimate from "./components/PrintableEstimate.jsx";
 import ShowWorkModal from "./components/ShowWorkModal.jsx";
 import TermsModal from "./components/TermsModal.jsx";
+import CoverageBar from "./components/CoverageBar.jsx";
+import LoadingScreen from "./components/LoadingScreen.jsx";
+import { buildEstimateSummary } from "./lib/summary.js";
+import { FONT_IMPORT, SHELL_CLASSES } from "./lib/theme.js";
 
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
-
-const SHELL_CLASSES = "min-h-screen flex items-center justify-center bg-[#F0EEE8] text-[#232530]";
+// navigator.clipboard needs a secure context, which an internal tool reached
+// over plain http on a LAN is not. The textarea route is deprecated everywhere
+// but is still the only thing that works there, so it stays as the fallback.
+async function writeToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const scratch = document.createElement("textarea");
+  scratch.value = text;
+  scratch.setAttribute("readonly", "");
+  scratch.style.position = "fixed";
+  scratch.style.opacity = "0";
+  document.body.appendChild(scratch);
+  scratch.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(scratch);
+  if (!copied) throw new Error("The browser refused the copy.");
+}
 
 // Shown until the shared staff password is accepted. The gate covers the whole
 // tool rather than just the settings pane, so nothing about a student's numbers
@@ -128,14 +148,9 @@ export default function App() {
       .catch(() => setAuthenticated(false));
   }, []);
 
-  if (authenticated === null) {
-    return (
-      <div style={{ fontFamily: "'IBM Plex Sans', sans-serif" }} className={SHELL_CLASSES}>
-        <style>{FONT_IMPORT}</style>
-        Loading…
-      </div>
-    );
-  }
+  // The gate skeleton, not the estimator one: until this resolves, the only
+  // thing that can legitimately come next is the password card.
+  if (authenticated === null) return <LoadingScreen variant="gate" />;
 
   if (!authenticated) return <LoginScreen onAuthenticated={handleAuthenticated} />;
 
@@ -160,6 +175,7 @@ function FinancialAidEstimator({ onSignedOut }) {
   const [studentName, setStudentName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [printOpen, setPrintOpen] = useState(false);
+  const [copiedAt, setCopiedAt] = useState(null);
   const [workOpen, setWorkOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -312,6 +328,15 @@ function FinancialAidEstimator({ onSignedOut }) {
     return () => clearTimeout(t);
   }, [settingsSavedAt]);
 
+  // The same shape as settingsSavedAt: the timestamp is the state and one
+  // effect clears it, so a component that unmounts mid-timeout cannot leave a
+  // button still claiming "Copied".
+  useEffect(() => {
+    if (!copiedAt) return;
+    const t = setTimeout(() => setCopiedAt(null), 2000);
+    return () => clearTimeout(t);
+  }, [copiedAt]);
+
   const signOut = useCallback(async () => {
     try {
       await api.logout();
@@ -320,14 +345,7 @@ function FinancialAidEstimator({ onSignedOut }) {
     }
   }, [onSignedOut]);
 
-  if (!loaded) {
-    return (
-      <div style={{ fontFamily: "'IBM Plex Sans', sans-serif" }} className="min-h-screen flex items-center justify-center bg-[#F0EEE8] text-[#232530]">
-        <style>{FONT_IMPORT}</style>
-        Loading…
-      </div>
-    );
-  }
+  if (!loaded) return <LoadingScreen variant="app" />;
 
   const selectedProgram = programs.find((p) => p.id === selectedProgramId) || programs[0] || null;
 
@@ -436,6 +454,39 @@ function FinancialAidEstimator({ onSignedOut }) {
     }
   };
 
+  // Staff quote these figures into an email or a CRM note, and retyping them
+  // off the screen is where transcription errors come from. Name and date of
+  // birth are left out on purpose: those belong to the printed worksheet, which
+  // is the student's own document, not to a clipboard headed somewhere unknown.
+  const copyEstimate = async () => {
+    const text = buildEstimateSummary({
+      program: selectedProgram,
+      settings,
+      sai,
+      maxFlag,
+      minFlag,
+      isIndependent,
+      parentPlusDenied,
+      startDate,
+      scholarshipAmount,
+      seogAmount,
+      aidPackage,
+      crossoverBoundary,
+      termMonths,
+      interestRate,
+      monthlyPayment,
+      totalPaid: financedTotalPaid,
+    });
+    if (!text) return;
+
+    try {
+      await writeToClipboard(text);
+      setCopiedAt(Date.now());
+    } catch {
+      flashError("Couldn't copy to the clipboard — your browser blocked it.");
+    }
+  };
+
   const resetPrograms = async () => {
     try {
       const restored = await api.resetPrograms();
@@ -461,12 +512,21 @@ function FinancialAidEstimator({ onSignedOut }) {
 
       {/* Header */}
       <div className="border-b border-[#C9C4B8] bg-[#F0EEE8]/95 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="serif text-2xl font-medium tracking-tight text-[#232530]">Financial Aid Estimator</h1>
             <p className="text-xs text-[#6B6656] mt-0.5">Staff tool — estimate only, not an official award</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={copyEstimate}
+              disabled={!hasResult}
+              title={hasResult ? "Copy this estimate as text" : "Enter an SAI to produce an estimate first"}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-[#C9C4B8] hover:bg-[#E7E3D8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {copiedAt ? <Check size={15} className="text-[#4A7C59]" /> : <ClipboardCopy size={15} />}
+              {copiedAt ? "Copied" : "Copy"}
+            </button>
             <button
               onClick={() => setPrintOpen(true)}
               disabled={!hasResult}
@@ -495,6 +555,13 @@ function FinancialAidEstimator({ onSignedOut }) {
           </div>
         </div>
       </div>
+
+      {/* A live region has to be in the DOM already when its text changes, so
+          this stays mounted and empty rather than arriving with the banner
+          below — a region that appears alongside its message is a new node, not
+          a change, and announces nothing. Kept outside the estimate column so
+          an empty one cannot take a space-y margin. */}
+      <span role="status" aria-live="polite" className="sr-only">{statusMsg}</span>
 
       <div className="max-w-3xl mx-auto px-5 pt-6 space-y-5">
         {statusMsg && (
@@ -795,16 +862,16 @@ function FinancialAidEstimator({ onSignedOut }) {
                         Charge: {formatMoney(r.tuitionSlice)}
                         {r.downPaymentCharge > 0 && ` (includes ${formatMoney(r.downPaymentCharge)} down payment)`}
                       </div>
-                      {r.grants > 0 && (
-                        <div className="text-xs text-[#4A7C59] mb-2">
-                          Grant aid applied: {formatMoney(r.grants)}
-                          {scholarshipAmount > 0 && seogAmount > 0
-                            ? ` (${formatMoney(scholarshipAmount)} scholarship + ${formatMoney(seogAmount)} SEOG)`
-                            : scholarshipAmount > 0
-                            ? " (scholarship)"
-                            : " (SEOG)"}
-                        </div>
-                      )}
+                      {/* Stands in for the two lines that used to sit here —
+                          "Grant aid applied" and "Still due this period" — both
+                          of which the legend now states, next to the sources
+                          they were previously separated from. */}
+                      <CoverageBar
+                        row={r}
+                        isLastPeriod={r.index === aidPackage.rows.length - 1}
+                        scholarshipAmount={scholarshipAmount}
+                        seogAmount={seogAmount}
+                      />
                       <div className="grid grid-cols-3 gap-2 text-sm">
                         <div>
                           <div className="text-[10px] text-[#9A9584]">Pell</div>
@@ -821,9 +888,6 @@ function FinancialAidEstimator({ onSignedOut }) {
                           {r.unsubGross < r.unsubCeiling && <div className="text-[9px] text-[#9A9584]">ceiling {formatMoney(r.unsubCeiling)}, not fully drawn</div>}
                         </div>
                       </div>
-                      {r.remainingBalance > 0 && (
-                        <div className="text-xs text-[#B8863B] mt-2">Still due this period: {formatMoney(r.remainingBalance)}</div>
-                      )}
                     </div>
                   ))}
                 </div>

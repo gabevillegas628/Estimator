@@ -24,8 +24,16 @@ src/
     PrintDialog.jsx       Collects print-only name / date of birth
     PrintableEstimate.jsx The printed worksheet
     ShowWorkModal.jsx     Step-by-step trace of how the estimate was reached
+    TermsModal.jsx        TERMS.md, readable without leaving the tool
+    CoverageBar.jsx       One period's charge, drawn as what covers it
+    LoadingScreen.jsx     Skeletons for the two waits (session check, data load)
   lib/aid-calc.js      Pure aid math — no React, no network. Tested.
+  lib/summary.js       The estimate as plain text, for the clipboard. Tested.
   lib/api.js           The only place the client talks to the server
+  lib/theme.js         Font import, shell classes, coverage palette
+public/                Favicon + touch icon, copied verbatim into the build
+scripts/
+  make-touch-icon.mjs  Redraws apple-touch-icon.png from favicon.svg's geometry
 server/
   index.js             Express: API routes, static build, SPA fallback
   db.js                Postgres pool and queries
@@ -36,6 +44,11 @@ shared/
   defaults.js          Seed programs + settings, used by client AND server
 test/                  Vitest regression suite
 ```
+
+The two icons are one drawing in two formats: `public/favicon.svg` is the
+real one, and `node scripts/make-touch-icon.mjs` re-renders the iOS PNG from
+the same coordinates (no rasterizer dependency — the artwork is four
+rectangles and zlib ships with Node). Change the SVG, rerun the script.
 
 The split that matters is `lib/aid-calc.js`: every function in it is
 deterministic on its arguments, which is what makes the regression tests

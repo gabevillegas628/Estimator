@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Financial Aid Estimator">
+  <!-- The app's own coverage bar, shrunk to a tab: gift aid, borrowed, still
+       owed. Three flat blocks rather than a glyph, because at 16px a glyph is
+       mud and a color split still reads. -->
+  <defs>
+    <clipPath id="pill"><rect x="4" y="12" width="24" height="8" rx="4"/></clipPath>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#7A3B54"/>
+  <g clip-path="url(#pill)">
+    <rect x="4" y="12" width="11" height="8" fill="#6B8F71"/>
+    <rect x="15" y="12" width="6" height="8" fill="#F0EEE8"/>
+    <rect x="21" y="12" width="7" height="8" fill="#D9A15B"/>
+  </g>
+</svg>

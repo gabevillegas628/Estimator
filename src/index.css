@@ -46,3 +46,18 @@
     break-inside: avoid;
   }
 }
+
+/* The skeletons pulse, the coverage bars grow into place, and the crossover
+   banner fades in. None of that is load-bearing, so anyone who has asked their
+   system for less motion gets the same screens without it. Kept as one blanket
+   rule rather than per-component opt-outs, so a new animation is covered the
+   day it is written rather than the day someone remembers. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

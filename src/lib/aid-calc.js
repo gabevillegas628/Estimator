@@ -408,6 +408,58 @@ export function buildAidPackage({ periods, totalProgramHours, totalCost, downPay
   return { rows, totals, totalSteps };
 }
 
+// ---------------------------------------------------------------------------
+// Coverage segments
+//
+// Splits one period's charge into the parts that cover it, in the order the
+// packaging actually applies them: Pell, then scholarship/SEOG, then any credit
+// carried in from the period before, then subsidized, then unsubsidized, and
+// whatever nothing reaches is still owed.
+//
+// The segments always sum to the charge, which is the entire point — a bar
+// drawn from them cannot show a period as more or less than fully accounted
+// for. Aid that OVERSHOOTS the charge is deliberately not a segment: it is not
+// covering this charge, it becomes the credit the next period carries in. That
+// is why each source is clamped to what is still uncovered rather than drawn at
+// its face amount.
+//
+// The carried-in credit is not a field on the row — buildAidPackage keeps it in
+// a running local — but it is recoverable rather than re-derived: it is exactly
+// the part of the charge that nothing else on the row accounts for.
+// ---------------------------------------------------------------------------
+export function coverageSegments(row) {
+  const charge = Math.max(Number(row?.tuitionSlice) || 0, 0);
+  if (charge <= 0) return [];
+
+  let uncovered = charge;
+  const take = (amount) => {
+    const applied = Math.min(Math.max(Number(amount) || 0, 0), uncovered);
+    uncovered -= applied;
+    return applied;
+  };
+
+  const pell = take(row.pell);
+  const grants = take(row.grants);
+  const subNet = take(row.subNet);
+  const unsubNet = take(row.unsubNet);
+
+  // What is left is the shortfall plus whatever credit arrived from the last
+  // period. The row knows the shortfall, so the credit is the difference.
+  const stillDue = Math.min(Math.max(Number(row.remainingBalance) || 0, 0), uncovered);
+  const carriedCredit = uncovered - stillDue;
+
+  // Ordered as staff read it, which is not the order the clamping ran in:
+  // the credit belongs with the other gift aid, ahead of anything borrowed.
+  return [
+    { key: "pell", label: "Pell Grant", amount: pell },
+    { key: "grants", label: "Scholarship / SEOG", amount: grants },
+    { key: "credit", label: "Credit carried forward", amount: carriedCredit },
+    { key: "sub", label: "Subsidized loan", amount: subNet },
+    { key: "unsub", label: "Unsubsidized loan", amount: unsubNet },
+    { key: "due", label: "Still due", amount: stillDue },
+  ].filter((s) => s.amount > 0.005);
+}
+
 // Pell-only concept: flags an enrollment that straddles a July 1 award-year
 // boundary. Loans have no equivalent — a loan period crosses July 1 with no
 // special handling. Resolving a crossover is a school policy decision, so this
