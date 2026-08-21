@@ -19,6 +19,8 @@ one covers *how to run it*.
 ```
 src/
   App.jsx              Login gate + the estimator UI
+  components/
+    SettingsModal.jsx  School-wide config, in a modal
   lib/aid-calc.js      Pure aid math — no React, no network. Tested.
   lib/api.js           The only place the client talks to the server
 server/

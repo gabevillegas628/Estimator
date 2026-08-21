@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ChevronDown, ChevronUp, TriangleAlert, Info, Plus, Trash2, RotateCcw, Lock, LogOut, Eye, EyeOff, Check } from "lucide-react";
+import { Settings, ChevronDown, ChevronUp, TriangleAlert, Info, Lock, LogOut, Eye, EyeOff } from "lucide-react";
 
 import {
   formatMoney,
@@ -12,6 +12,7 @@ import {
 } from "./lib/aid-calc.js";
 import { DEFAULT_PROGRAMS, DEFAULT_SETTINGS, DEPENDENCY_CRITERIA } from "../shared/defaults.js";
 import { api, AuthError } from "./lib/api.js";
+import SettingsModal from "./components/SettingsModal.jsx";
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
 
@@ -195,6 +196,7 @@ function DownPaymentEstimator({ onSignedOut }) {
           setSelectedProgramId(loadedPrograms[0].id);
         }
         setSettings(loadedSettings);
+        lastSavedSettings.current = loadedSettings;
         setTermMonths(loadedSettings.defaultTermMonths);
         setInterestRate(loadedSettings.defaultInterestRate);
       } catch (err) {
@@ -244,6 +246,16 @@ function DownPaymentEstimator({ onSignedOut }) {
     setSettingsSavedAt(null);
   }, []);
 
+  // Snapshot of what the server last confirmed, so closing the modal can offer
+  // to throw away unsaved edits and put the real values back.
+  const lastSavedSettings = useRef(DEFAULT_SETTINGS);
+
+  const discardSettingChanges = useCallback(() => {
+    setSettings(lastSavedSettings.current);
+    setSettingsDirty(false);
+    setSettingsSavedAt(null);
+  }, []);
+
   // Saves everything in the settings panel, not just the settings half. Program
   // rows still write on their own so nothing is ever lost, but the button has to
   // account for them too or "Saved" would be a lie while a debounce is pending.
@@ -253,7 +265,9 @@ function DownPaymentEstimator({ onSignedOut }) {
       await flushProgramWrites();
       // The server merges over defaults on write, so take back what it stored
       // rather than assuming local state matches.
-      setSettings(await api.saveSettings(settings));
+      const saved = await api.saveSettings(settings);
+      setSettings(saved);
+      lastSavedSettings.current = saved;
       setSettingsDirty(false);
       setSettingsSavedAt(Date.now());
     } catch (err) {
@@ -754,219 +768,25 @@ function DownPaymentEstimator({ onSignedOut }) {
           </div>
         )}
 
-        {/* Settings accordion */}
+        {/* Settings lives in a modal rather than an accordion at the foot of
+            the page: its trigger is in the header, and opening a panel 800px
+            below the button looked like nothing had happened. */}
         {settingsOpen && (
-          <div className="fade-in bg-white rounded-lg border border-[#DDD8CA] p-5 space-y-6">
-            <div>
-              <h2 className="serif text-lg mb-1">Programs</h2>
-              <p className="text-xs text-[#9A9584] mb-3">Shared with everyone who opens this tool. Student SAI entries above are never saved. "Tuition" prorates across periods by each period's share of total program hours. "Down payment" (books/kit or similar) is a charge added entirely to Period 1 — Pell reduces the combined Period-1 total in one shot, no special sequencing. Pell and loan limits prorate separately, by each period's share of one academic year.</p>
-              <div className="space-y-3">
-                {programs.map((p) => (
-                  <div key={p.id} className="border border-[#DDD8CA] rounded-md p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        className="flex-1 border border-[#C9C4B8] rounded px-2 py-1.5 text-sm font-medium"
-                        value={p.name}
-                        onChange={(e) => updateProgramField(p.id, "name", e.target.value)}
-                      />
-                      <button onClick={() => removeProgram(p.id)} className="text-[#9A9584] hover:text-[#B8863B]">
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Tuition ($)</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.totalCost} onChange={(e) => updateProgramField(p.id, "totalCost", Number(e.target.value))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Down payment ($)</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.downPayment} onChange={(e) => updateProgramField(p.id, "downPayment", Number(e.target.value))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Clock hours</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.clockHours} onChange={(e) => updateProgramField(p.id, "clockHours", Number(e.target.value))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-[#9A9584]">Length (weeks)</label>
-                        <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono mt-0.5"
-                          value={p.lengthWeeks} onChange={(e) => updateProgramField(p.id, "lengthWeeks", Number(e.target.value))} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-3 mt-3">
-                <button onClick={addProgram} className="flex items-center gap-1 text-sm text-[#7A3B54] hover:underline">
-                  <Plus size={14} /> Add program
-                </button>
-                <button onClick={resetPrograms} className="flex items-center gap-1 text-sm text-[#9A9584] hover:underline">
-                  <RotateCcw size={14} /> Restore sample list
-                </button>
-              </div>
-            </div>
-
-            <div className="dotted-rule pt-5">
-              <h2 className="serif text-lg mb-3">Award year figures</h2>
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div>
-                  <label className="text-xs text-[#9A9584]">Award year label</label>
-                  <input className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5" value={settings.awardYearLabel}
-                    onChange={(e) => updateSetting({ ...settings, awardYearLabel: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Max Pell</label>
-                  <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMax}
-                    onChange={(e) => updateSetting({ ...settings, awardYearMax: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Min Pell</label>
-                  <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearMin}
-                    onChange={(e) => updateSetting({ ...settings, awardYearMin: Number(e.target.value) })} />
-                </div>
-              </div>
-              <p className="text-xs text-[#9A9584] mt-2">These change every award year via the Dept. of Education's Pell Grant payment letter — update at the start of each award year.</p>
-            </div>
-
-            <div className="dotted-rule pt-5">
-              <h2 className="serif text-lg mb-3">Academic year definition</h2>
-              <div className="w-40">
-                <label className="text-xs text-[#9A9584]">Clock hours</label>
-                <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.academicYearHours}
-                  onChange={(e) => updateSetting({ ...settings, academicYearHours: Number(e.target.value) })} />
-              </div>
-              <p className="text-xs text-[#9A9584] mt-2">
-                Governs both Pell proration and loan-period progression (grade level bumps once a period completes this many hours).
-                Pull this from your catalog / Title IV program definitions, not a guess.
-              </p>
-            </div>
-
-            <div className="dotted-rule pt-5">
-              <h2 className="serif text-lg mb-3">Financing defaults</h2>
-              <div className="grid grid-cols-3 gap-3 text-sm w-96">
-                <div>
-                  <label className="text-xs text-[#9A9584]">Default term (months)</label>
-                  <input type="number" className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.defaultTermMonths}
-                    onChange={(e) => updateSetting({ ...settings, defaultTermMonths: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Default rate (% APR)</label>
-                  <input type="number" step={0.1} className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.defaultInterestRate}
-                    onChange={(e) => updateSetting({ ...settings, defaultInterestRate: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Loan origination fee (%)</label>
-                  <input type="number" step={0.001} className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.originationFeePct}
-                    onChange={(e) => updateSetting({ ...settings, originationFeePct: Number(e.target.value) })} />
-                </div>
-              </div>
-              <p className="text-xs text-[#9A9584] mt-2">
-                Term/rate are starting points staff can adjust live per student. Origination fee is set by ED per award year — check the current Dear Colleague Letter.
-              </p>
-            </div>
-
-            <div className="dotted-rule pt-5">
-              <h2 className="serif text-lg mb-1">Loan limits</h2>
-              <p className="text-xs text-[#9A9584] mb-3">
-                Federal Direct Subsidized/Unsubsidized annual limits — set by statute (34 CFR 685.203), unchanged
-                since 2008, so these don't need annual updates the way Pell does. Source: FSA Handbook Vol. 8, Ch. 4.
-              </p>
-              <div className="space-y-3">
-                {["dependent", "independent"].map((group) => (
-                  <div key={group}>
-                    <div className="text-xs font-medium text-[#232530] mb-1">
-                      {group === "independent" ? "Independent / parent PLUS denied" : "Dependent"}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      {["year1", "year2", "year3"].map((yr, i) => (
-                        <div key={yr} className="border border-[#DDD8CA] rounded px-2 py-1.5">
-                          <div className="text-[10px] text-[#9A9584] mb-1">{["Year 1", "Year 2", "Year 3+"][i]}</div>
-                          <div className="flex items-center gap-1 mb-1">
-                            <span className="text-[10px] text-[#9A9584]">Sub</span>
-                            <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono text-xs"
-                              value={settings.loanLimits[group][yr].sub}
-                              onChange={(e) => updateSetting({
-                                ...settings,
-                                loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], sub: Number(e.target.value) } } },
-                              })} />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-[#9A9584]">Total</span>
-                            <input type="number" className="w-full border border-[#C9C4B8] rounded px-1.5 py-1 mono text-xs"
-                              value={settings.loanLimits[group][yr].total}
-                              onChange={(e) => updateSetting({
-                                ...settings,
-                                loanLimits: { ...settings.loanLimits, [group]: { ...settings.loanLimits[group], [yr]: { ...settings.loanLimits[group][yr], total: Number(e.target.value) } } },
-                              })} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-3 text-sm w-80">
-                <div>
-                  <label className="text-xs text-[#9A9584]">Dependent aggregate (sub / total)</label>
-                  <div className="flex gap-1 mt-1">
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentSub} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentSub: Number(e.target.value) } })} />
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateDependentTotal} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateDependentTotal: Number(e.target.value) } })} />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-[#9A9584]">Independent aggregate (sub / total)</label>
-                  <div className="flex gap-1 mt-1">
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentSub} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentSub: Number(e.target.value) } })} />
-                    <input type="number" className="w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.loanLimits.aggregateIndependentTotal} onChange={(e) => updateSetting({ ...settings, loanLimits: { ...settings.loanLimits, aggregateIndependentTotal: Number(e.target.value) } })} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="dotted-rule pt-5">
-              <h2 className="serif text-lg mb-2 flex items-center gap-2">
-                Crossover policy note <Info size={14} className="text-[#9A9584]" />
-              </h2>
-              <textarea
-                rows={3}
-                placeholder="e.g. 'Assign crossover payment periods to the award year of the student's start date, unless remaining eligibility runs out — confirm with [financial aid director] on exceptions.'"
-                className="w-full border border-[#C9C4B8] rounded px-3 py-2 text-sm"
-                value={settings.crossoverNote}
-                onChange={(e) => updateSetting({ ...settings, crossoverNote: e.target.value })}
-              />
-              <p className="text-xs text-[#9A9584] mt-2">
-                This is a policy choice the school makes for Pell specifically — the banner above only flags <em>when</em> it applies. Loan periods (below) aren't affected by this since they follow the academic year, not the award year.
-              </p>
-            </div>
-
-            {/* Sticks to the bottom of the viewport while the panel is open, so
-                the button is reachable without scrolling back down a long form. */}
-            <div className="sticky bottom-0 -mx-5 -mb-5 px-5 py-3 bg-white border-t border-[#DDD8CA] flex items-center gap-3">
-              <button
-                type="button"
-                onClick={saveAllSettings}
-                disabled={savingSettings}
-                className="rounded-md bg-[#7A3B54] text-white text-sm font-medium px-4 py-2 hover:bg-[#633044] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {savingSettings ? "Saving…" : "Save changes"}
-              </button>
-
-              {settingsDirty && !savingSettings && (
-                <span className="text-sm text-[#B8863B]">Unsaved changes</span>
-              )}
-              {settingsSavedAt && !settingsDirty && (
-                <span className="fade-in flex items-center gap-1.5 text-sm text-[#4A7C59]">
-                  <Check size={15} />
-                  Saved
-                </span>
-              )}
-              {!settingsDirty && !settingsSavedAt && !savingSettings && (
-                <span className="text-sm text-[#9A9584]">All changes saved</span>
-              )}
-            </div>
-          </div>
+          <SettingsModal
+            settings={settings}
+            updateSetting={updateSetting}
+            programs={programs}
+            updateProgramField={updateProgramField}
+            addProgram={addProgram}
+            removeProgram={removeProgram}
+            resetPrograms={resetPrograms}
+            settingsDirty={settingsDirty}
+            settingsSavedAt={settingsSavedAt}
+            savingSettings={savingSettings}
+            onSave={saveAllSettings}
+            onDiscard={discardSettingChanges}
+            onClose={() => setSettingsOpen(false)}
+          />
         )}
 
         <p className="text-xs text-[#9A9584] text-center pt-4">
