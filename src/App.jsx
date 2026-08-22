@@ -792,7 +792,7 @@ function FinancialAidEstimator({ onSignedOut }) {
                   Parent denied a Direct PLUS Loan
                 </label>
                 )}
-                <p className="text-[10px] text-[#9A9584] mt-1 max-w-[220px]">Later periods auto-progress a grade level each time an academic year completes.</p>
+                <p className="text-[10px] text-[#9A9584] mt-1 max-w-55">Later periods auto-progress a grade level each time an academic year completes.</p>
               </div>
               <div className="text-sm ml-auto">
                 <span className="text-[#9A9584]">Dependency status:</span>{" "}
