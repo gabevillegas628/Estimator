@@ -32,3 +32,11 @@ Thumbs.db
 # worksheet with only the name redacted — SAI, program, dates and amounts are
 # intact, and it carries school branding. This repo is public; keep it local.
 *.pdf
+
+# Planning notes, held local on purpose. Both describe features designed
+# against federal rules and web research rather than against a real worksheet
+# — there is no validated estimate sheet involving Parent PLUS to check them
+# against, and NJCLASS is unmodeled besides. They stay out of the repo until
+# the tool has been used in earnest and the gaps are worth closing for real.
+BACKLOG.md
+PARENT-PLUS-PLAN.md
