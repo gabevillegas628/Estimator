@@ -60,7 +60,18 @@ for reference. It is no longer the source of truth and is not built or served.
 
 // Settings (school-wide, shared)
 {
-  awardYearLabel: "2026-27",
+  awardYearStart: 2026,        // The year the award year opens, and the only
+                                // dated thing staff edit. The label below, the
+                                // age-24 dependency cutoff, and the homeless
+                                // determination window all derive from it.
+                                // Deliberately not read off the system clock:
+                                // the award year in play is not the calendar
+                                // year, and Pell max/min can only be updated
+                                // by a human, so a clock would advance half
+                                // the screen and leave the rest behind.
+  awardYearLabel: "2026-27",   // Derived from awardYearStart on every read and
+                                // write (mergeSettings) — never edited, and
+                                // never trusted from a stored row
   awardYearMax: 7395,          // Update annually — see Pell section below
   awardYearMin: 740,
   academicYearHours: 900,      // School's defined academic year (hours).

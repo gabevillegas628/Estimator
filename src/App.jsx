@@ -13,7 +13,7 @@ import {
   explainMonthlyPayment,
   uid,
 } from "./lib/aid-calc.js";
-import { DEFAULT_PROGRAMS, DEFAULT_SETTINGS, DEPENDENCY_CRITERIA } from "../shared/defaults.js";
+import { DEFAULT_PROGRAMS, DEFAULT_SETTINGS, dependencyCriteria } from "../shared/defaults.js";
 import { api, AuthError } from "./lib/api.js";
 import SettingsModal from "./components/SettingsModal.jsx";
 import PrintDialog from "./components/PrintDialog.jsx";
@@ -760,7 +760,10 @@ function FinancialAidEstimator({ onSignedOut }) {
                     use it rather than re-deriving.
                   </p>
                   <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1">
-                    {DEPENDENCY_CRITERIA.map((c) => (
+                    {/* Built from the award year rather than stored, so the
+                        two dated criteria cannot outlive the label above. Only
+                        runs while this panel is open. */}
+                    {dependencyCriteria(settings.awardYearStart).map((c) => (
                       <li key={c.key} className="text-xs text-[#6B6656] flex gap-1.5">
                         <span className="text-[#9A9584]">•</span>
                         <span>{c.label}</span>

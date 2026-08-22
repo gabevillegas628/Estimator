@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { X, Plus, Trash2, RotateCcw, Info, Check } from "lucide-react";
 
 import { formatMoney, parseMoneyInput } from "../lib/aid-calc.js";
+import { dependencyCriteria, formatAwardYear, normalizeAwardYearStart } from "../../shared/defaults.js";
 
 // A dollar field. <input type="number"> can only ever hold a bare numeric
 // string -- "$23,000" is not a value it accepts -- so money is a text input
@@ -34,6 +35,39 @@ function MoneyInput({ value, onChange, className = "", ...rest }) {
         // as they are typed, which is why this component does not own state.
         onChange(parseMoneyInput(e.target.value));
       }}
+      onBlur={() => setDraft(null)}
+    />
+  );
+}
+
+// The award year, entered as the year it opens. The same draft trick as
+// MoneyInput -- a half-typed year must not be rewritten under the caret -- with
+// one addition: nothing is reported until all four digits are there. Reporting
+// "20" would date the whole tool to the year 20 for as long as it took to type
+// the rest, since the label and both dependency dates follow from this field.
+function YearInput({ value, onChange, className = "", ...rest }) {
+  const [draft, setDraft] = useState(null);
+
+  return (
+    <input
+      {...rest}
+      type="number"
+      min={2000}
+      max={2099}
+      step={1}
+      className={className}
+      value={draft === null ? String(value) : draft}
+      onFocus={(e) => {
+        setDraft(String(value));
+        e.target.select();
+      }}
+      onChange={(e) => {
+        const typed = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+        setDraft(typed);
+        if (typed.length === 4) onChange(Number(typed));
+      }}
+      // Dropping the draft restores the last good year, so a field left holding
+      // "20" reverts instead of persisting a year nobody meant.
       onBlur={() => setDraft(null)}
     />
   );
@@ -232,9 +266,9 @@ export default function SettingsModal({
               <h2 className="serif text-lg mb-3">Award year figures</h2>
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
-                  <label className="text-xs text-[#9A9584]">Award year label</label>
-                  <input className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5" value={settings.awardYearLabel}
-                    onChange={(e) => updateSetting({ ...settings, awardYearLabel: e.target.value })} />
+                  <label className="text-xs text-[#9A9584]">Award year opens</label>
+                  <YearInput className="mt-1 w-full border border-[#C9C4B8] rounded px-2 py-1.5 mono" value={settings.awardYearStart}
+                    onChange={(year) => updateSetting({ ...settings, awardYearStart: year, awardYearLabel: formatAwardYear(year) })} />
                 </div>
                 <div>
                   <label className="text-xs text-[#9A9584]">Max Pell</label>
@@ -247,7 +281,17 @@ export default function SettingsModal({
                     onChange={(n) => updateSetting({ ...settings, awardYearMin: n })} />
                 </div>
               </div>
-              <p className="text-xs text-[#9A9584] mt-2">These change every award year via the Dept. of Education's Pell Grant payment letter — update at the start of each award year.</p>
+              {/* The consequence of the year, quoted from the list it actually
+                  feeds rather than recomputed here — a second copy of that
+                  arithmetic is the drift this field was changed to remove. */}
+              {normalizeAwardYearStart(settings.awardYearStart) && (
+                <p className="text-xs text-[#6B6656] mt-2">
+                  Everything dated follows from this. The tool reads{" "}
+                  <span className="mono">{settings.awardYearLabel}</span>, and the dependency list says “
+                  {dependencyCriteria(settings.awardYearStart).find((c) => c.key === "age24").label}”.
+                </p>
+              )}
+              <p className="text-xs text-[#9A9584] mt-2">Max and min Pell change every award year via the Dept. of Education's Pell Grant payment letter — update them alongside the year.</p>
             </div>
 
             <div className="dotted-rule pt-5">
